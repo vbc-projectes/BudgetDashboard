@@ -22,7 +22,7 @@ async function startApp() {
                 nodeIntegration: false,
                 contextIsolation: true,
                 preload: path.join(__dirname, 'preload.js'),
-                devTools: true
+                devTools: !electronApp.isPackaged
             }
         });
 
@@ -55,6 +55,7 @@ async function startApp() {
 
     } catch (err) {
         console.error('❌ Error iniciando la app:', err);
+        electronApp.quit();
     }
 }
 

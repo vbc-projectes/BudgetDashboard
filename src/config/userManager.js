@@ -1,7 +1,10 @@
 const fs = require('fs');
 const path = require('path');
+const config = require('./config');
 
-const USERS_ROOT = path.join(process.cwd(), 'usuarios');
+const USERS_ROOT = path.isAbsolute(config.USERS_ROOT)
+    ? config.USERS_ROOT
+    : path.join(process.cwd(), config.USERS_ROOT);
 const CURRENT_USER_FILE = path.join(USERS_ROOT, '.current_user.json');
 const PROFILE_FILE_NAME = 'profile.json';
 
@@ -23,11 +26,9 @@ function normalizeUserName(name) {
     if (!trimmed) {
         throw new Error('Nombre de usuario requerido');
     }
-    if (/[<>:"/\\|?*\x00-\x1F]/.test(trimmed)) {
-        throw new Error('Nombre de usuario invalido');
-    }
-    if (trimmed.includes('..')) {
-        throw new Error('Nombre de usuario invalido');
+    // Whitelist: letters (incl. accented), digits, spaces, hyphens, underscores — max 50 chars
+    if (!/^[\w\u00C0-\u024F_ -]{1,50}$/.test(trimmed)) {
+        throw new Error('Nombre de usuario invalido: solo letras, números, espacios, guiones y guiones bajos');
     }
     return trimmed;
 }

@@ -1,0 +1,117 @@
+<section id="bolsa" class="tab bolsa-tab" style="display:block;">
+  <h2 data-i18n="bolsa.titulo">Bolsa</h2>
+
+  <!-- BOTONES SUBPESTAÑAS -->
+  <div class="mb-15">
+    <button class="subtab-btn active-subtab" data-target="tabBolsaCartera" data-i18n="bolsa.tabs.cartera">Cartera</button>
+    <button class="subtab-btn" data-target="tabBolsaOperaciones" data-i18n="bolsa.tabs.operaciones">Operaciones</button>
+    <button class="subtab-btn" data-target="tabBolsaDividendos" data-i18n="bolsa.tabs.dividendos">Dividendos</button>
+  </div>
+
+  <!-- ===== CARTERA ===== -->
+  <div id="tabBolsaCartera" class="subtab">
+    <h3 data-i18n="bolsa.resumenCartera">Resumen de Cartera</h3>
+
+    <div class="bolsa-resumen-cards" id="bolsaResumenCards" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+      <div class="kpi-card"><span class="kpi-label" data-i18n="inversiones.kpi.invertido">Invertido</span><span class="kpi-value" id="bolsaTotalInvertido">—</span></div>
+      <div class="kpi-card"><span class="kpi-label" data-i18n="inversiones.kpi.valorActual">Valor actual</span><span class="kpi-value" id="bolsaValorActual">—</span></div>
+      <div class="kpi-card"><span class="kpi-label" data-i18n="inversiones.kpi.pnlLatente">P&amp;L latente</span><span class="kpi-value" id="bolsaPnl">—</span></div>
+      <div class="kpi-card"><span class="kpi-label" data-i18n="inversiones.kpi.dividendosNetos">Dividendos netos</span><span class="kpi-value" id="bolsaDividendosTotal">—</span></div>
+      <div class="kpi-card"><span class="kpi-label" data-i18n="inversiones.kpi.comisiones">Comisiones</span><span class="kpi-value" id="bolsaComisiones">—</span></div>
+    </div>
+
+    <div class="table-container">
+      <table id="tablaCartera">
+        <thead>
+          <tr>
+            <th data-i18n="tablas.ticker">Ticker</th>
+            <th data-i18n="tablas.empresa">Empresa</th>
+            <th data-i18n="tablas.cantidad">Acciones</th>
+            <th data-i18n="tablas.precioMedio">Precio medio</th>
+            <th data-i18n="tablas.costeTotal">Coste total</th>
+            <th data-i18n="tablas.precioActual">Precio actual</th>
+            <th data-i18n="tablas.valorActual">Valor actual</th>
+            <th data-i18n="tablas.pnl">P&amp;L</th>
+            <th data-i18n="tablas.pnlPct">P&amp;L %</th>
+            <th data-i18n="tablas.dividendos">Dividendos</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyCartera"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== OPERACIONES ===== -->
+  <div id="tabBolsaOperaciones" class="subtab display-none">
+    <h3 data-i18n="bolsa.tabs.operaciones">Operaciones</h3>
+    <div class="table-container">
+      <table id="tablaOperaciones">
+        <thead>
+          <tr>
+            <th class="w-120" data-i18n="tablas.tipo">Tipo</th>
+            <th data-i18n="tablas.ticker">Ticker</th>
+            <th data-i18n="tablas.empresa">Empresa</th>
+            <th data-i18n="tablas.fecha">Fecha</th>
+            <th data-i18n="tablas.cantidad">Cantidad</th>
+            <th data-i18n="tablas.precioUnit">Precio unit.</th>
+            <th data-i18n="tablas.comision">Comisión</th>
+            <th data-i18n="tablas.total">Total</th>
+            <th data-i18n="tablas.notas">Notas</th>
+            <th class="w-120" data-i18n="tablas.acciones">Acciones</th>
+          </tr>
+          <tr class="insert-row">
+            <td>
+              <select id="tipoOperacion">
+                <option value="compra" data-i18n="inversiones.compra">Compra</option>
+                <option value="venta" data-i18n="inversiones.venta">Venta</option>
+              </select>
+            </td>
+            <td><input type="text" id="tickerOperacion" placeholder="AAPL" style="text-transform:uppercase;width:80px;"></td>
+            <td><input type="text" id="empresaOperacion" data-i18n-placeholder="formularios.placeholderEmpresaOpc" placeholder="Empresa (opc.)"></td>
+            <td><input type="date" id="fechaOperacion"></td>
+            <td><input type="number" id="cantidadOperacion" step="0.0001" min="0.0001" placeholder="100" style="width:80px;"></td>
+            <td><input type="number" id="precioOperacion" step="0.01" min="0.01" placeholder="150.00" style="width:80px;"></td>
+            <td><input type="number" id="comisionOperacion" step="0.01" min="0" placeholder="0" style="width:70px;"></td>
+            <td></td>
+            <td><input type="text" id="notasOperacion" data-i18n-placeholder="formularios.placeholderNotasOpc" placeholder="Notas (opc.)"></td>
+            <td><button id="btnAgregarOperacion"><i class="fas fa-plus"></i></button></td>
+          </tr>
+        </thead>
+        <tbody id="tbodyOperaciones"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== DIVIDENDOS ===== -->
+  <div id="tabBolsaDividendos" class="subtab display-none">
+    <h3 data-i18n="bolsa.tabs.dividendos">Dividendos</h3>
+    <div class="table-container">
+      <table id="tablaDividendos">
+        <thead>
+          <tr>
+            <th data-i18n="tablas.ticker">Ticker</th>
+            <th data-i18n="tablas.empresa">Empresa</th>
+            <th data-i18n="tablas.fecha">Fecha</th>
+            <th data-i18n="tablas.bruto">Bruto</th>
+            <th data-i18n="tablas.retencion">Retención</th>
+            <th data-i18n="tablas.neto">Neto</th>
+            <th data-i18n="tablas.notas">Notas</th>
+            <th class="w-120" data-i18n="tablas.acciones">Acciones</th>
+          </tr>
+          <tr class="insert-row">
+            <td><input type="text" id="tickerDividendo" placeholder="AAPL" style="text-transform:uppercase;width:80px;"></td>
+            <td><input type="text" id="empresaDividendo" data-i18n-placeholder="formularios.placeholderEmpresaOpc" placeholder="Empresa (opc.)"></td>
+            <td><input type="date" id="fechaDividendo"></td>
+            <td><input type="number" id="importeBrutoDividendo" step="0.01" min="0" placeholder="100.00" style="width:80px;"></td>
+            <td><input type="number" id="retencionDividendo" step="0.01" min="0" placeholder="19.00" style="width:70px;"></td>
+            <td></td>
+            <td><input type="text" id="notasDividendo" data-i18n-placeholder="formularios.placeholderNotasOpc" placeholder="Notas (opc.)"></td>
+            <td><button id="btnAgregarDividendo"><i class="fas fa-plus"></i></button></td>
+          </tr>
+        </thead>
+        <tbody id="tbodyDividendos"></tbody>
+      </table>
+    </div>
+  </div>
+
+</section>

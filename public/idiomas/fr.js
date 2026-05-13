@@ -286,7 +286,13 @@ TRADUCCIONES.fr = {
             errorSinDatos: 'Aucune donnée à enregistrer',
             guardandoArchivo: 'Enregistrement du fichier...',
             errorGuardandoArchivo: 'Erreur lors de l\'enregistrement du fichier',
-            exitoArchivoGuardado: 'Fichier enregistré avec succès'
+exitoArchivoGuardado: 'Fichier enregistré avec succès',
+            errorPresetMapeoVacio: 'Vous devez compléter un mappage valide avant de sauvegarder le préréglage',
+            nombrePresetMapeo: 'Nom du préréglage de mappage:',
+            presetBancoDefault: 'Préréglage banque',
+            confirmarEliminarPreset: 'Supprimer ce préréglage de mappage?',
+            sinErroresValidacion: 'Aucune erreur de validation',
+            errorNoFilasValidas: "Aucune ligne valide pour continuer. Vérifiez le panneau de validation."
              },
 
         // ===== DASHBOARD =====
@@ -339,7 +345,9 @@ TRADUCCIONES.fr = {
             ingresosReales: 'Revenus reels',
             gastosReales: 'Depenses reelles',
             ahorrosReales: 'Epargne reelle',
-            realesSuffix: 'Reel'
+            realesSuffix: 'Reel',
+            periodoActivo: 'Période active',
+            ratioAhorro: "Taux d'épargne"
         },
 
         // ===== CATEGORÍAS =====
@@ -482,7 +490,14 @@ TRADUCCIONES.fr = {
             companyRequerido: 'Entreprise requise',
             tickerRequerido: 'Ticker requis',
             numeroAccionesInvalido: 'Nombre d\'actions invalide',
-            precioCompraInvalidoAlt: 'Prix d\'achat invalide'
+            precioCompraInvalidoAlt: 'Prix d\'achat invalide',
+            verHistorico: 'Voir historique',
+            historicalChart: 'Historique de',
+            precioEur: 'Prix (€)',
+            fechaEje: 'Date',
+            cargandoPrecio: 'Chargement...',
+            errorCargarDatos: 'Erreur de chargement des données',
+            errorGuardar: 'Erreur lors de l\'enregistrement'
         },
 
         // ===== IMPUESTOS =====
@@ -599,6 +614,96 @@ TRADUCCIONES.fr = {
             eliminar: 'Êtes-vous sûr de vouloir supprimer cet élément?',
             cancelar: 'Voulez-vous annuler cette opération?',
             salirSinGuardar: 'Voulez-vous quitter sans enregistrer les modifications?'
+        },
+
+        // ===== INVERSIONES =====
+        inversiones: {
+            titulo: 'Investissements',
+            tabs: {
+                activos: 'Positions',
+                cartera: 'Portefeuille',
+                operaciones: 'Transactions',
+                dividendos: 'Dividendes',
+                resumen: 'Résumé'
+            },
+            posicionesAbiertas: 'Positions ouvertes',
+            actualizarPrecios: 'Mettre à jour les prix',
+            notaPosiciones: 'Les positions sont calculées automatiquement à partir des transactions enregistrées.',
+            kpi: {
+                invertido: 'Investi',
+                valorActual: 'Valeur actuelle',
+                pnlLatente: 'P&L latent',
+                dividendosNetos: 'Dividendes nets',
+                comisiones: 'Commissions',
+                rentabilidadTotal: 'Rendement total',
+                gpRealizado: 'G/P réalisé',
+                rendimientoTotal: 'Rendement total €',
+                totalOps: 'Total transactions',
+                compras: 'Achats',
+                ventas: 'Ventes',
+                tickersUnicos: 'Tickers uniques',
+                gpTotalVentas: 'G/P total ventes'
+            },
+            distribucionCartera: 'Répartition du portefeuille',
+            sinPosiciones: 'Pas de positions',
+            rendimientoPorActivo: 'Rendement par actif (P&L €)',
+            sinDatosPnl: 'Pas de données P&L',
+            rendimientoHistorico: 'Rendement historique du portefeuille',
+            rendimientoEnPeriodo: 'rendement sur la période sélectionnée',
+            cargandoHistorico: 'Chargement des données historiques...',
+            sinDatosHistoricos: 'Pas de données historiques. Ajoutez des transactions pour voir la performance.',
+            operaciones: 'Transactions',
+            importarCSV: 'Importer CSV',
+            compra: 'Achat',
+            venta: 'Vente',
+            dividendosCobrados: 'Dividendes perçus',
+            sincronizarYahoo: 'Synchroniser depuis Yahoo',
+            notaDividendos: 'Les dividendes sont calculés automatiquement selon les actions détenues à chaque date de paiement.',
+            resumenOperaciones: 'Résumé des transactions',
+            mejoresVentasPct: '🏆 Meilleures ventes par %',
+            peoresVentasPct: '💀 Pires ventes par %',
+            mejoresVentasEur: 'Meilleures ventes par €',
+            peoresVentasEur: 'Pires ventes par €',
+            accionesMasMovidas: 'Actions les plus échangées',
+            cerrarPosicion: 'Clore la position',
+            notaCerrarPosicion: 'Une transaction de vente sera enregistrée avec les données fournies.',
+            confirmarVenta: 'Confirmer la vente',
+            importarOperaciones: 'Importer des transactions',
+            sinPosicionesAbiertas: 'Pas de positions ouvertes. Ajoutez des transactions d’achat.',
+            sinOperaciones: 'Aucune transaction enregistrée',
+            sinDividendos: 'Pas de dividendes. Appuyez sur "Synchroniser" pour récupérer depuis Yahoo Finance.',
+            sincronizando: 'Synchronisation…',
+            sinDividendosEncontrados: 'Pas de dividendes trouvés',
+            posicionCerrada: 'Position {ticker} clôturée',
+            camposObligatorios: 'Ticker, date, quantité et prix sont obligatoires.',
+            confirmarEliminarOp: 'Supprimer cette transaction?',
+            sinOperacionesSeleccionadas: 'Aucune transaction sélectionnée.',
+            operacionesImportadas: '{n} transaction(s) importée(s) avec succès',
+            operacionesFallaron: '{n} transaction(s) ont échoué à l’importation',
+            sinOperacionesEnArchivo: 'Aucune transaction d’achat/vente trouvée dans le fichier.',
+            sinDatos: 'Pas de données',
+            cargando: 'Chargement…'
+        },
+
+        // ===== BOLSA =====
+        bolsa: {
+            titulo: 'Bourse',
+            tabs: {
+                cartera: 'Portefeuille',
+                operaciones: 'Transactions',
+                dividendos: 'Dividendes'
+            },
+            resumenCartera: 'Résumé du portefeuille',
+            operaciones: 'Transactions',
+            dividendos: 'Dividendes',
+            obteniendoPrecios: 'Récupération des prix...',
+            sinPosiciones: 'Pas de positions ouvertes',
+            sinOperaciones: 'Aucune transaction enregistrée',
+            sinDividendos: 'Aucun dividende enregistré',
+            camposObligatorios: 'Ticker, date, quantité et prix sont obligatoires.',
+            camposDividendoObligatorios: 'Ticker, date et montant brut sont obligatoires.',
+            confirmarEliminarOp: 'Supprimer cette transaction?',
+            confirmarEliminarDiv: 'Supprimer ce dividende?'
         }
     };
 

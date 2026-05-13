@@ -74,7 +74,7 @@
 
                 let yAxisConfig = {
                     display: true,
-                    title: { display: true, text: 'Precio (€)' },
+                    title: { display: true, text: ingresosManager.t('ingresos.precioEur', 'Precio (€)') },
                     ticks: {
                         callback: function (value) { return '€' + value.toFixed(2); }
                     }
@@ -121,7 +121,7 @@
                         scales: {
                             x: {
                                 display: true,
-                                title: { display: true, text: 'Fecha' },
+                                title: { display: true, text: ingresosManager.t('ingresos.fechaEje', 'Fecha') },
                                 ticks: { maxRotation: 45, minRotation: 45, maxTicksLimit: 12 }
                             },
                             y: yAxisConfig
@@ -136,7 +136,7 @@
             } catch (error) {
                 loadingDiv.innerHTML = `
                     <i class="fas fa-exclamation-circle" style="font-size: 24px; color: #ef4444;"></i>
-                    <p style="margin-top: 10px; color: #ef4444;">Error al cargar los datos: ${error.message}</p>
+                    <p style="margin-top: 10px; color: #ef4444;">${ingresosManager.t('ingresos.errorCargarDatos', 'Error al cargar los datos')}: ${error.message}</p>
                 `;
                 loadingDiv.style.display = 'block';
                 chartCanvas.style.display = 'none';
@@ -286,7 +286,7 @@
                         <td class="editable" data-field="shares">${asset.shares}</td>
                         <td class="editable" data-field="purchase_price"><strong>${ingresosManager.formatCurrency(asset.purchase_price)}</strong></td>
                         <td><strong>${ingresosManager.formatCurrency(totalInvestment)}</strong></td>
-                        <td class="current-price"><span style="color:#999;">Cargando...</span></td>
+                        <td class="current-price"><span style="color:#999;">${ingresosManager.t('ingresos.cargandoPrecio', 'Cargando...')}</span></td>
                         <td class="current-value">—</td>
                         <td class="diff-percent">—</td>
                         <td class="diff-amount">—</td>

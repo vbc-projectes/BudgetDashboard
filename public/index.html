@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; font-src 'self' https://cdnjs.cloudflare.com; connect-src 'self' https://api.exchangerate-api.com https://query2.finance.yahoo.com https://cdn.jsdelivr.net; img-src 'self' data:;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; font-src 'self' https://cdnjs.cloudflare.com; connect-src 'self' https://api.exchangerate-api.com https://query2.finance.yahoo.com https://cdn.jsdelivr.net; img-src 'self' data:;">
     <title data-i18n="app.tituloPagina">Dashboard Económico</title>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -35,6 +35,7 @@
             <button class="tablink" data-tab="impuestos" data-i18n-title="nav.impuestos" data-i18n-aria-label="nav.impuestos" title="Impuestos" aria-label="Impuestos"><i class="fas fa-receipt"></i></button>
             <button class="tablink" data-tab="importacionBancaria" data-i18n-title="nav.importarBanco" data-i18n-aria-label="nav.importarBanco" title="Importar Banco" aria-label="Importar Banco"><i class="fas fa-file-import"></i></button>
             <button class="tablink" data-tab="hucha" data-i18n-title="nav.hucha" data-i18n-aria-label="nav.hucha" title="Hucha Real" aria-label="Hucha Real"><i class="fas fa-piggy-bank"></i></button>
+            <button class="tablink" data-tab="inversiones" title="Inversiones" aria-label="Inversiones"><i class="fas fa-chart-pie"></i></button>
         </nav>
 
         <div class="sidebar-bottom">
@@ -46,7 +47,7 @@
     </aside>
 
     <div class="app-body">
-        <div id="windowTitlebar" class="window-titlebar" aria-label="Controles de ventana">
+        <div id="windowTitlebar" class="window-titlebar" aria-label="Controles de ventana" style="display:none">
             <div class="window-controls" role="group" aria-label="Controles de ventana">
                 <button id="windowMinimizeBtn" class="window-control-btn" type="button" title="Minimizar" aria-label="Minimizar">
                     <i class="fas fa-minus"></i>
@@ -197,6 +198,7 @@
 <script src="js/tabModules/hucha/hucha.subhuchas.js"></script>
 <script src="js/tabModules/hucha/hucha.core.js"></script>
 <script src="Pestañas/hucha/hucha.js"></script>
+<script src="Pestañas/inversiones/inversiones.js"></script>
 <script src="js/tabModules/importacion/importacion.mapping.js"></script>
 <script src="js/tabModules/importacion/importacion.charts.js"></script>
 <script src="js/tabModules/importacion/importacion.savedFiles.js"></script>

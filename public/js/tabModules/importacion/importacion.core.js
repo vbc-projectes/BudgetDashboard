@@ -275,7 +275,7 @@ function actualizarPanelValidacion() {
     bodyErrores.innerHTML = '';
     if (invalidas === 0) {
         const tr = document.createElement('tr');
-        tr.innerHTML = '<td colspan="4">Sin errores de validacion</td>';
+        tr.innerHTML = `<td colspan="4">${tt('importacion.sinErroresValidacion', 'Sin errores de validacion')}</td>`;
         bodyErrores.appendChild(tr);
     } else {
         estadoImportacion.datosMapadosInvalidos.slice(0, 100).forEach((item) => {
@@ -464,11 +464,11 @@ function aplicarPresetMapeo(presetId) {
 
 async function guardarPresetActual() {
     if (!validarMapeo()) {
-        showAlert('⚠️ Debes completar un mapeo válido antes de guardar preset', 'warning');
+        showAlert(tt('importacion.errorPresetMapeoVacio', 'Debes completar un mapeo válido antes de guardar preset'), 'warning');
         return;
     }
 
-    const nombre = window.prompt('Nombre del preset de mapeo:', estadoImportacion.presetSeleccionado || 'Preset banco');
+    const nombre = window.prompt(tt('importacion.nombrePresetMapeo', 'Nombre del preset de mapeo:'), estadoImportacion.presetSeleccionado || tt('importacion.presetBancoDefault', 'Preset banco'));
     if (!nombre) return;
 
     const presets = obtenerPresetsMapeo();
@@ -506,7 +506,7 @@ async function eliminarPresetSeleccionado() {
     if (!select || !select.value) return;
 
     const confirmed = typeof window.showConfirm === 'function'
-        ? await window.showConfirm('¿Eliminar este preset de mapeo?', 'Confirmar')
+        ? await window.showConfirm(tt('importacion.confirmarEliminarPreset', '¿Eliminar este preset de mapeo?'), 'Confirmar')
         : window.confirm('¿Eliminar este preset de mapeo?');
     if (!confirmed) return;
 
@@ -643,7 +643,7 @@ function setupEventListeners() {
                 if (hayValidos) {
                     mostrarSeleccionConceptos();
                 } else {
-                    showAlert('⚠️ No hay filas validas para continuar. Revisa el panel de validacion.', 'warning');
+                    showAlert(tt('importacion.errorNoFilasValidas', 'No hay filas validas para continuar. Revisa el panel de validacion.'), 'warning');
                 }
             }
         });
@@ -860,7 +860,7 @@ function handleFileSelect(file) {
     const esCSV = file.name.endsWith('.csv');
 
     if (!esExcel && !esCSV) {
-        showAlert('❌ ' + t('importacion.errorArchivoFormato'), 'error');
+        showAlert(t('importacion.errorArchivoFormato'), 'error');
         document.getElementById('fileProgress').style.display = 'none';
         return;
     }
@@ -881,7 +881,7 @@ function leerExcel(file) {
             const data = e.target.result;
             // Usamos XLSX que debe estar cargado globalmente
             if (typeof XLSX === 'undefined') {
-                showAlert('❌ ' + t('importacion.errorXlsxNoEstaCargado'));
+                showAlert(t('importacion.errorXlsxNoEstaCargado'));
                 return;
             }
             const workbook = XLSX.read(data, { type: 'array' });
@@ -897,7 +897,7 @@ function leerExcel(file) {
             mostrarMapeoColumnas();
         } catch (error) {
             console.error('Error al leer Excel:', error);
-            showAlert('❌ ' + t('importacion.errorExcelInvalido'));
+            showAlert(t('importacion.errorExcelInvalido'));
             document.getElementById('fileProgress').style.display = 'none';
         }
     };
@@ -913,7 +913,7 @@ function leerCSV(file) {
             const lineas = csv.trim().split('\n').filter(l => l.trim());
             
             if (lineas.length < 2) {
-                showAlert('El archivo CSV no tiene datos válidos.');
+                showAlert(tt('importacion.errorCSVInvalido', 'El archivo CSV no tiene datos válidos.'));
                 document.getElementById('fileProgress').style.display = 'none';
                 return;
             }
@@ -969,7 +969,7 @@ function leerCSV(file) {
             }
 
             if (jsonData.length === 0) {
-                showAlert('El archivo CSV no contiene datos válidos.');
+                showAlert(tt('importacion.errorCSVSinDatos', 'El archivo CSV no contiene datos válidos.'));
                 document.getElementById('fileProgress').style.display = 'none';
                 return;
             }
@@ -983,7 +983,7 @@ function leerCSV(file) {
             mostrarMapeoColumnas();
         } catch (error) {
             console.error('❌ Error al leer CSV:', error);
-            showAlert('Error al procesar el archivo CSV: ' + error.message);
+            showAlert(tt('importacion.errorCSVProcesar', 'Error al procesar el archivo CSV') + ': ' + error.message);
             document.getElementById('fileProgress').style.display = 'none';
         }
     };
@@ -1268,7 +1268,7 @@ function tieneCategoriasCompletasGuardadas() {
 function aplicarCategoriaMasiva() {
     const masivo = document.getElementById('categoriaMasivaSelect');
     if (!masivo || !masivo.value) {
-        showAlert('⚠️ Selecciona una categoria masiva antes de aplicar', 'warning');
+        showAlert('Selecciona una categoria masiva antes de aplicar', 'warning');
         return;
     }
 
@@ -1282,7 +1282,7 @@ function aplicarCategoriaMasiva() {
     });
 
     if (aplicados === 0) {
-        showAlert('⚠️ La categoria seleccionada no aplica a los conceptos visibles', 'warning');
+        showAlert('La categoria seleccionada no aplica a los conceptos visibles', 'warning');
         return;
     }
 
@@ -1312,7 +1312,7 @@ function actualizarAnalisis() {
 
     if (!desdeInput || !hastaInput) {
         console.warn('Rango de fechas no establecido');
-        showAlert('⚠️ ' + t('importacion.errorRangoFechas'), 'info');
+        showAlert(t('importacion.errorRangoFechas'), 'info');
         alternarLoadingAnalisis(false);
         return;
     }
@@ -1343,7 +1343,7 @@ function actualizarAnalisis() {
     console.log('📊 Muestra filtrada:', datosFilterados.slice(0, 3));
 
     if (datosFilterados.length === 0) {
-        showAlert('⚠️ ' + t('importacion.errorSinDatosRango'), 'info');
+        showAlert(t('importacion.errorSinDatosRango'), 'info');
         estadoImportacion.datosAnalisisActual = [];
         actualizarKpisAnalisis([]);
         alternarLoadingAnalisis(false);
@@ -1412,7 +1412,7 @@ function exportarDatos() {
         : estadoImportacion.datosMapados;
 
     if (!dataset || dataset.length === 0) {
-        showAlert('⚠️ No hay datos para exportar', 'warning');
+        showAlert('No hay datos para exportar', 'warning');
         return;
     }
 
@@ -1486,7 +1486,7 @@ function descargarErroresValidacion() {
 
 async function mostrarSeleccionCategorias() {
     if (!estadoImportacion.datosMapados || estadoImportacion.datosMapados.length === 0) {
-        showAlert('⚠️ No hay datos mapeados para guardar', 'warning');
+        showAlert('No hay datos mapeados para guardar', 'warning');
         return;
     }
 
@@ -1662,7 +1662,7 @@ async function mostrarSeleccionCategorias() {
         console.log('✅ Selección de categorías mostrada:', Object.keys(conceptosMap).length, 'conceptos únicos');
     } catch (error) {
         console.error('❌ Error cargando categorías:', error);
-        showAlert(`❌ Error al cargar categorías: ${error.message}`, 'error');
+        showAlert(`Error al cargar categorías: ${error.message}`, 'error');
     }
 }
 
@@ -1688,7 +1688,7 @@ function obtenerCategoriasSeleccionadasDesdeTabla() {
 async function confirmarCategoriasYContinuar() {
     const { categoriasSeleccionadas, sinSeleccionar } = obtenerCategoriasSeleccionadasDesdeTabla();
     if (sinSeleccionar.length > 0) {
-        showAlert('⚠️ Por favor selecciona categoría para todos los conceptos', 'warning');
+        showAlert('Por favor selecciona categoría para todos los conceptos', 'warning');
         return;
     }
 
@@ -1736,7 +1736,7 @@ function resolverCategoriaSugerida(concepto, tipo, categorias, revisionGuardada,
 
 async function guardarEnBaseDatos() {
     if (!estadoImportacion.datosMapados || estadoImportacion.datosMapados.length === 0) {
-        showAlert('⚠️ No hay datos mapeados para guardar', 'warning');
+        showAlert('No hay datos mapeados para guardar', 'warning');
         return;
     }
 
@@ -1750,7 +1750,7 @@ async function guardarEnBaseDatos() {
 
     // Validar que todas las categorías estén seleccionadas
     if (sinSeleccionar.length > 0) {
-        showAlert('⚠️ Por favor selecciona categoría para todos los conceptos', 'warning');
+        showAlert('Por favor selecciona categoría para todos los conceptos', 'warning');
         return;
     }
 
@@ -1839,10 +1839,10 @@ async function guardarEnBaseDatos() {
         }
 
         const total = exitosos + fallidos;
-        const mensaje = `✅ Guardados: ${exitosos}/${total} registros`;
+        const mensaje = `Guardados: ${exitosos}/${total} registros`;
         
         if (fallidos > 0) {
-            showAlert(`${mensaje}\n⚠️ Fallidos: ${fallidos}\n${mensajeError ? '❌ ' + mensajeError : ''}`, 'warning');
+            showAlert(`${mensaje}\nFallidos: ${fallidos}\n${mensajeError ? mensajeError : ''}`, 'warning');
         } else {
             showAlert(mensaje, 'success');
         }
@@ -1856,7 +1856,7 @@ async function guardarEnBaseDatos() {
 
     } catch (error) {
         console.error('❌ Error guardando en BD:', error);
-        showAlert(`❌ ${error.message || error}`, 'error');
+        showAlert(`${error.message || error}`, 'error');
     }
 }
 

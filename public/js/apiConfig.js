@@ -1,10 +1,19 @@
 /**
  * API Adapter - Proporciona una interfaz compatible con fetch para usar IPC
  * Este adaptador permite mantener el código del frontend casi sin cambios
+ * En modo web (sin Electron) delega directamente al fetch del navegador.
  */
 
 // Guardar el fetch original
 const originalFetch = window.fetch;
+
+// ── Web mode: no Electron available — use real fetch directly ─────────
+if (typeof window.electronAPI === 'undefined') {
+    window.API = { fetch: (url, opts) => originalFetch(url, opts) };
+    window.fetch = window.API.fetch.bind(window.API);
+    console.log('✅ API Adapter cargado — modo web (fetch nativo)');
+} else {
+// ── Electron mode: route API calls through IPC ────────────────────────
 
 window.API = {
     /**
@@ -70,314 +79,166 @@ window.API = {
     },
 
     /**
-     * Mapea URLs y métodos HTTP a llamadas IPC
+     * Mapea URLs y métodos HTTP a llamadas IPC.
+     * Exact-match routes use a constant-time lookup table.
+     * Parameterized routes (path params or query strings) are handled below.
      * @private
      */
     async _callIPC(url, method, body) {
-        // Categorías
-        if (url === '/add/categoria' && method === 'POST') {
-            return await window.electronAPI.addCategoria(body);
-        }
-        if (url === '/categorias' && method === 'GET') {
-            return await window.electronAPI.getCategorias();
-        }
-        if (url === '/update/categoria' && method === 'POST') {
-            return await window.electronAPI.updateCategoria(body);
-        }
-        if (url === '/delete/categoria' && method === 'POST') {
-            return await window.electronAPI.deleteCategoria(body);
+        const api = window.electronAPI;
+        const qmark = url.indexOf('?');
+        const basePath = qmark >= 0 ? url.slice(0, qmark) : url;
+        const params   = qmark >= 0 ? new URLSearchParams(url.slice(qmark + 1)) : new URLSearchParams();
+
+        // ── Exact-match route table (O(1) lookup) ─────────────────────
+        const EXACT = {
+            // Categorías
+            'GET:/categorias':                     () => api.getCategorias(),
+            'POST:/add/categoria':                 () => api.addCategoria(body),
+            'POST:/update/categoria':              () => api.updateCategoria(body),
+            'POST:/delete/categoria':              () => api.deleteCategoria(body),
+            // Gastos Puntuales
+            'POST:/add/gasto_puntual':             () => api.addGastoPuntual(body),
+            'POST:/delete/gasto_puntual':          () => api.deleteGastoPuntual(body),
+            'POST:/update/gasto_puntual':          () => api.updateGastoPuntual(body),
+            // Gastos Reales
+            'POST:/add/gasto_real':                () => api.addGastoReal(body),
+            'POST:/delete/gasto_real':             () => api.deleteGastoReal(body),
+            'POST:/update/gasto_real':             () => api.updateGastoReal(body),
+            // Gastos Mensuales
+            'POST:/add/gasto_mensual':             () => api.addGastoMensual(body),
+            'POST:/delete/gasto_mensual':          () => api.deleteGastoMensual(body),
+            'POST:/update/gasto_mensual':          () => api.updateGastoMensual(body),
+            // Ingresos Puntuales
+            'POST:/add/ingreso_puntual':           () => api.addIngresoPuntual(body),
+            'POST:/delete/ingreso_puntual':        () => api.deleteIngresoPuntual(body),
+            'POST:/update/ingreso_puntual':        () => api.updateIngresoPuntual(body),
+            // Ingresos Reales
+            'POST:/add/ingreso_real':              () => api.addIngresoReal(body),
+            'POST:/delete/ingreso_real':           () => api.deleteIngresoReal(body),
+            'POST:/update/ingreso_real':           () => api.updateIngresoReal(body),
+            // Ingresos Mensuales
+            'POST:/add/ingreso_mensual':           () => api.addIngresoMensual(body),
+            'POST:/delete/ingreso_mensual':        () => api.deleteIngresoMensual(body),
+            'POST:/update/ingreso_mensual':        () => api.updateIngresoMensual(body),
+            // Import (banco)
+            'POST:/import/gasto_puntual':          () => api.importGastosPuntuales(body),
+            'POST:/import/ingreso_puntual':        () => api.importIngresosPuntuales(body),
+            'POST:/import/gasto_real':             () => api.importGastosReales(body),
+            'POST:/import/ingreso_real':           () => api.importIngresosReales(body),
+            // Impuestos Puntuales
+            'POST:/add/impuesto_puntual':          () => api.addImpuestoPuntual(body),
+            'POST:/delete/impuesto_puntual':       () => api.deleteImpuestoPuntual(body),
+            'POST:/update/impuesto_puntual':       () => api.updateImpuestoPuntual(body),
+            // Impuestos Mensuales
+            'POST:/add/impuesto_mensual':          () => api.addImpuestoMensual(body),
+            'POST:/delete/impuesto_mensual':       () => api.deleteImpuestoMensual(body),
+            'POST:/update/impuesto_mensual':       () => api.updateImpuestoMensual(body),
+            // Hucha
+            'GET:/hucha':                          () => api.getHucha(),
+            'POST:/add/hucha':                     () => api.addHucha(body),
+            'POST:/update/hucha':                  () => api.updateHucha(body),
+            'POST:/delete/hucha':                  () => api.deleteHucha(body),
+            // Sub-Huchas
+            'GET:/sub_huchas':                     () => api.getSubHuchas(),
+            'POST:/add/sub_hucha':                 () => api.addSubHucha(body),
+            'POST:/update/sub_hucha':              () => api.updateSubHucha(body),
+            'POST:/delete/sub_hucha':              () => api.deleteSubHucha(body),
+            'POST:/add/sub_hucha_puntual':         () => api.addSubHuchaPuntual(body),
+            'POST:/delete/sub_hucha_puntual':      () => api.deleteSubHuchaPuntual(body),
+            // Cuenta Remunerada
+            'GET:/cuenta_remunerada':              () => api.getCuentaRemunerada(),
+            'POST:/add/cuenta_remunerada':         () => api.addCuentaRemunerada(body),
+            'POST:/update/cuenta_remunerada':      () => api.updateCuentaRemunerada(body),
+            'POST:/delete/cuenta_remunerada':      () => api.deleteCuentaRemunerada(body),
+            // Assets (legacy)
+            'GET:/assets':                         () => api.getAssets(),
+            'POST:/add/asset':                     () => api.addAsset(body),
+            'POST:/update/asset':                  () => api.updateAsset(body),
+            'POST:/delete/asset':                  () => api.deleteAsset(body),
+            'POST:/sell/asset':                    () => api.sellAsset(body),
+            // Dashboard
+            'GET:/dashboard':                      () => api.getDashboard(),
+            'GET:/dashboard-real':                 () => api.getDashboardReal(),
+            'GET:/resumen-periodos':               () => api.getResumenPeriodos(),
+            // Importación Bancaria
+            'GET:/api/importacion/listar':         () => api.importList(),
+            'POST:/api/importacion/guardar':       () => api.importSave(body),
+            // Usuarios
+            'GET:/users':                          () => api.listUsers(),
+            'GET:/users/current':                  () => api.getCurrentUser(),
+            'POST:/users/create':                  () => api.createUser(body),
+            'POST:/users/select':                  () => api.setCurrentUser(body),
+            // Bolsa / Inversiones
+            'POST:/bolsa/ensure-setup':            () => api.bolsaEnsureSetup(),
+            'GET:/bolsa/operaciones':              () => api.bolsaGetOperaciones(),
+            'POST:/bolsa/operaciones':             () => api.bolsaAddOperacion(body),
+            'GET:/bolsa/dividendos':               () => api.bolsaGetDividendos(),
+            'POST:/bolsa/dividendos':              () => api.bolsaAddDividendo(body),
+            'GET:/bolsa/posiciones':               () => api.bolsaGetPosiciones(),
+            'GET:/bolsa/resumen':                  () => api.bolsaGetResumen(),
+            'GET:/bolsa/estadisticas':             () => api.bolsaGetEstadisticas(),
+            'POST:/bolsa/sync-dividendos':         () => api.bolsaSyncDividendos(),
+        };
+
+        const exactKey = `${method}:${basePath}`;
+        if (EXACT[exactKey]) return EXACT[exactKey]();
+
+        // ── Query-string parameterized GETs ───────────────────────────
+        if (method === 'GET') {
+            switch (basePath) {
+                case '/impuestos-mes':
+                    return api.getImpuestosMes({ desde: params.get('desde'), hasta: params.get('hasta') });
+                case '/impuestos-mes-real':
+                    return api.getImpuestosMesReal({ desde: params.get('desde'), hasta: params.get('hasta') });
+                case '/ahorros-mes':
+                    return api.getAhorrosMes({ desde: params.get('desde'), hasta: params.get('hasta'), categoria_id: params.get('categoria_id') });
+                case '/ahorros-mes-real':
+                    return api.getAhorrosMesReal({ desde: params.get('desde'), hasta: params.get('hasta'), categoria_id: params.get('categoria_id') });
+                case '/categorias-periodo':
+                    return api.getCategoriasPeriodo({ desde: params.get('desde'), hasta: params.get('hasta') });
+                case '/categorias-periodo-real':
+                    return api.getCategoriasPeriodoReal({ desde: params.get('desde'), hasta: params.get('hasta') });
+                case '/gastos-categoria-mes':
+                    return api.getGastosCategoriaMes({ desde: params.get('desde'), hasta: params.get('hasta') });
+                case '/gastos-categoria-mes-real':
+                    return api.getGastosCategoriaMesReal({ desde: params.get('desde'), hasta: params.get('hasta') });
+                case '/sub_huchas/total':
+                    return api.getSubHuchasTotal(params.get('mes'));
+            }
         }
 
-        // Gastos Puntuales
-        if (url === '/add/gasto_puntual' && method === 'POST') {
-            return await window.electronAPI.addGastoPuntual(body);
-        }
-        if (url === '/delete/gasto_puntual' && method === 'POST') {
-            return await window.electronAPI.deleteGastoPuntual(body);
-        }
-        if (url === '/update/gasto_puntual' && method === 'POST') {
-            return await window.electronAPI.updateGastoPuntual(body);
+        // ── Path-parameterized routes ─────────────────────────────────
+        let m;
+
+        if ((m = basePath.match(/^\/asset-price\/(.+)$/)))
+            return api.getAssetPrice(decodeURIComponent(m[1]));
+
+        if (method === 'GET' && (m = basePath.match(/^\/asset-history\/(.+)$/)))
+            return api.getAssetHistory(decodeURIComponent(m[1]), params.get('period') || '1y');
+
+        if (method === 'GET' && (m = basePath.match(/^\/sub_huchas\/(\d+)\/puntuales$/)))
+            return api.getSubHuchaPuntuales(Number(m[1]));
+
+        if (method === 'GET' && (m = basePath.match(/^\/api\/importacion\/contenido\/(.+)$/)))
+            return api.importContent(decodeURIComponent(m[1]));
+
+        if ((method === 'POST' || method === 'DELETE') && (m = basePath.match(/^\/api\/importacion\/eliminar\/(.+)$/)))
+            return api.importDelete(decodeURIComponent(m[1]));
+
+        if (method === 'PUT' && (m = basePath.match(/^\/bolsa\/operaciones\/(\d+)$/)))
+            return api.bolsaUpdateOperacion({ ...body, id: Number(m[1]) });
+
+        if (method === 'DELETE' && (m = basePath.match(/^\/bolsa\/operaciones\/(\d+)$/)))
+            return api.bolsaDeleteOperacion(Number(m[1]));
+
+        if ((m = basePath.match(/^\/bolsa\/dividendos\/(\d+)$/))) {
+            if (method === 'PUT')    return api.bolsaUpdateDividendo({ ...body, id: Number(m[1]) });
+            if (method === 'DELETE') return api.bolsaDeleteDividendo(Number(m[1]));
         }
 
-        // Gastos Reales
-        if (url === '/add/gasto_real' && method === 'POST') {
-            return await window.electronAPI.addGastoReal(body);
-        }
-        if (url === '/delete/gasto_real' && method === 'POST') {
-            return await window.electronAPI.deleteGastoReal(body);
-        }
-        if (url === '/update/gasto_real' && method === 'POST') {
-            return await window.electronAPI.updateGastoReal(body);
-        }
-
-        // Gastos Mensuales
-        if (url === '/add/gasto_mensual' && method === 'POST') {
-            return await window.electronAPI.addGastoMensual(body);
-        }
-        if (url === '/delete/gasto_mensual' && method === 'POST') {
-            return await window.electronAPI.deleteGastoMensual(body);
-        }
-        if (url === '/update/gasto_mensual' && method === 'POST') {
-            return await window.electronAPI.updateGastoMensual(body);
-        }
-
-        // Ingresos Puntuales
-        if (url === '/add/ingreso_puntual' && method === 'POST') {
-            return await window.electronAPI.addIngresoPuntual(body);
-        }
-        if (url === '/delete/ingreso_puntual' && method === 'POST') {
-            return await window.electronAPI.deleteIngresoPuntual(body);
-        }
-        if (url === '/update/ingreso_puntual' && method === 'POST') {
-            return await window.electronAPI.updateIngresoPuntual(body);
-        }
-
-        // Ingresos Reales
-        if (url === '/add/ingreso_real' && method === 'POST') {
-            return await window.electronAPI.addIngresoReal(body);
-        }
-        if (url === '/delete/ingreso_real' && method === 'POST') {
-            return await window.electronAPI.deleteIngresoReal(body);
-        }
-        if (url === '/update/ingreso_real' && method === 'POST') {
-            return await window.electronAPI.updateIngresoReal(body);
-        }
-
-        // Ingresos Mensuales
-        if (url === '/add/ingreso_mensual' && method === 'POST') {
-            return await window.electronAPI.addIngresoMensual(body);
-        }
-        if (url === '/delete/ingreso_mensual' && method === 'POST') {
-            return await window.electronAPI.deleteIngresoMensual(body);
-        }
-        if (url === '/update/ingreso_mensual' && method === 'POST') {
-            return await window.electronAPI.updateIngresoMensual(body);
-        }
-
-        // Import Puntuales (Banco)
-        if (url === '/import/gasto_puntual' && method === 'POST') {
-            return await window.electronAPI.importGastosPuntuales(body);
-        }
-        if (url === '/import/ingreso_puntual' && method === 'POST') {
-            return await window.electronAPI.importIngresosPuntuales(body);
-        }
-        if (url === '/import/gasto_real' && method === 'POST') {
-            return await window.electronAPI.importGastosReales(body);
-        }
-        if (url === '/import/ingreso_real' && method === 'POST') {
-            return await window.electronAPI.importIngresosReales(body);
-        }
-
-        // Impuestos Puntuales
-        if (url === '/add/impuesto_puntual' && method === 'POST') {
-            return await window.electronAPI.addImpuestoPuntual(body);
-        }
-        if (url === '/delete/impuesto_puntual' && method === 'POST') {
-            return await window.electronAPI.deleteImpuestoPuntual(body);
-        }
-        if (url === '/update/impuesto_puntual' && method === 'POST') {
-            return await window.electronAPI.updateImpuestoPuntual(body);
-        }
-
-        // Impuestos Mensuales
-        if (url === '/add/impuesto_mensual' && method === 'POST') {
-            return await window.electronAPI.addImpuestoMensual(body);
-        }
-        if (url === '/delete/impuesto_mensual' && method === 'POST') {
-            return await window.electronAPI.deleteImpuestoMensual(body);
-        }
-        if (url === '/update/impuesto_mensual' && method === 'POST') {
-            return await window.electronAPI.updateImpuestoMensual(body);
-        }
-
-        // Hucha
-        if (url === '/hucha' && method === 'GET') {
-            return await window.electronAPI.getHucha();
-        }
-        if (url === '/add/hucha' && method === 'POST') {
-            return await window.electronAPI.addHucha(body);
-        }
-        if (url === '/update/hucha' && method === 'POST') {
-            return await window.electronAPI.updateHucha(body);
-        }
-        if (url === '/delete/hucha' && method === 'POST') {
-            return await window.electronAPI.deleteHucha(body);
-        }
-
-        // Sub-Huchas
-        if (url === '/sub_huchas' && method === 'GET') {
-            return await window.electronAPI.getSubHuchas();
-        }
-        if (url === '/add/sub_hucha' && method === 'POST') {
-            return await window.electronAPI.addSubHucha(body);
-        }
-        if (url === '/update/sub_hucha' && method === 'POST') {
-            return await window.electronAPI.updateSubHucha(body);
-        }
-        if (url === '/delete/sub_hucha' && method === 'POST') {
-            return await window.electronAPI.deleteSubHucha(body);
-        }
-        if (url.match(/^\/sub_huchas\/\d+\/puntuales$/) && method === 'GET') {
-            const id = url.split('/')[2];
-            return await window.electronAPI.getSubHuchaPuntuales(Number(id));
-        }
-        if (url === '/add/sub_hucha_puntual' && method === 'POST') {
-            return await window.electronAPI.addSubHuchaPuntual(body);
-        }
-        if (url === '/delete/sub_hucha_puntual' && method === 'POST') {
-            return await window.electronAPI.deleteSubHuchaPuntual(body);
-        }
-        if (url.startsWith('/sub_huchas/total') && method === 'GET') {
-            const params = new URLSearchParams(url.split('?')[1]);
-            return await window.electronAPI.getSubHuchasTotal(params.get('mes'));
-        }
-
-        // Cuenta Remunerada
-        if (url === '/cuenta_remunerada' && method === 'GET') {
-            return await window.electronAPI.getCuentaRemunerada();
-        }
-        if (url === '/add/cuenta_remunerada' && method === 'POST') {
-            return await window.electronAPI.addCuentaRemunerada(body);
-        }
-        if (url === '/update/cuenta_remunerada' && method === 'POST') {
-            return await window.electronAPI.updateCuentaRemunerada(body);
-        }
-        if (url === '/delete/cuenta_remunerada' && method === 'POST') {
-            return await window.electronAPI.deleteCuentaRemunerada(body);
-        }
-
-        // Assets
-        if (url === '/assets' && method === 'GET') {
-            return await window.electronAPI.getAssets();
-        }
-        if (url === '/add/asset' && method === 'POST') {
-            return await window.electronAPI.addAsset(body);
-        }
-        if (url === '/update/asset' && method === 'POST') {
-            return await window.electronAPI.updateAsset(body);
-        }
-        if (url === '/delete/asset' && method === 'POST') {
-            return await window.electronAPI.deleteAsset(body);
-        }
-        if (url === '/sell/asset' && method === 'POST') {
-            return await window.electronAPI.sellAsset(body);
-        }
-        if (url.startsWith('/asset-price/') && method === 'GET') {
-            const ticker = url.replace('/asset-price/', '');
-            return await window.electronAPI.getAssetPrice(ticker);
-        }
-
-        // Dashboard
-        if (url === '/dashboard' && method === 'GET') {
-            return await window.electronAPI.getDashboard();
-        }
-        if (url === '/dashboard-real' && method === 'GET') {
-            return await window.electronAPI.getDashboardReal();
-        }
-        if (url.startsWith('/impuestos-mes?') && method === 'GET') {
-            const params = new URLSearchParams(url.split('?')[1]);
-            return await window.electronAPI.getImpuestosMes({
-                desde: params.get('desde'),
-                hasta: params.get('hasta')
-            });
-        }
-        if (url.startsWith('/impuestos-mes-real?') && method === 'GET') {
-            const params = new URLSearchParams(url.split('?')[1]);
-            return await window.electronAPI.getImpuestosMesReal({
-                desde: params.get('desde'),
-                hasta: params.get('hasta')
-            });
-        }
-        if (url.startsWith('/ahorros-mes?') && method === 'GET') {
-            const params = new URLSearchParams(url.split('?')[1]);
-            return await window.electronAPI.getAhorrosMes({
-                desde: params.get('desde'),
-                hasta: params.get('hasta'),
-                categoria_id: params.get('categoria_id')
-            });
-        }
-        if (url.startsWith('/ahorros-mes-real?') && method === 'GET') {
-            const params = new URLSearchParams(url.split('?')[1]);
-            return await window.electronAPI.getAhorrosMesReal({
-                desde: params.get('desde'),
-                hasta: params.get('hasta'),
-                categoria_id: params.get('categoria_id')
-            });
-        }
-        if (url.startsWith('/categorias-periodo?') && method === 'GET') {
-            const params = new URLSearchParams(url.split('?')[1]);
-            return await window.electronAPI.getCategoriasPeriodo({
-                desde: params.get('desde'),
-                hasta: params.get('hasta')
-            });
-        }
-        if (url.startsWith('/categorias-periodo-real?') && method === 'GET') {
-            const params = new URLSearchParams(url.split('?')[1]);
-            return await window.electronAPI.getCategoriasPeriodoReal({
-                desde: params.get('desde'),
-                hasta: params.get('hasta')
-            });
-        }
-        if (url.startsWith('/gastos-categoria-mes?') && method === 'GET') {
-            const params = new URLSearchParams(url.split('?')[1]);
-            return await window.electronAPI.getGastosCategoriaMes({
-                desde: params.get('desde'),
-                hasta: params.get('hasta')
-            });
-        }
-        if (url.startsWith('/gastos-categoria-mes-real?') && method === 'GET') {
-            const params = new URLSearchParams(url.split('?')[1]);
-            return await window.electronAPI.getGastosCategoriaMesReal({
-                desde: params.get('desde'),
-                hasta: params.get('hasta')
-            });
-        }
-        if (url === '/resumen-periodos' && method === 'GET') {
-            return await window.electronAPI.getResumenPeriodos();
-        }
-
-        // Importación Bancaria
-        if (url === '/api/importacion/listar' && method === 'GET') {
-            return await window.electronAPI.importList();
-        }
-        if (url.startsWith('/api/importacion/contenido/') && method === 'GET') {
-            const id = url.replace('/api/importacion/contenido/', '');
-            return await window.electronAPI.importContent(id);
-        }
-        if (url.startsWith('/api/importacion/eliminar/') && (method === 'POST' || method === 'DELETE')) {
-            const id = url.replace('/api/importacion/eliminar/', '');
-            return await window.electronAPI.importDelete(id);
-        }
-        if (url === '/api/importacion/guardar' && method === 'POST') {
-            return await window.electronAPI.importSave(body);
-        }
-
-        // Yahoo Finance - Assets
-        if (url.startsWith('/asset-price/') && method === 'GET') {
-            const ticker = url.replace('/asset-price/', '');
-            return await window.electronAPI.getAssetPrice(ticker);
-        }
-        if (url.startsWith('/asset-history/') && method === 'GET') {
-            const parts = url.split('?');
-            const ticker = parts[0].replace('/asset-history/', '');
-            const params = new URLSearchParams(parts[1] || '');
-            const period = params.get('period') || '1y';
-            return await window.electronAPI.getAssetHistory(ticker, period);
-        }
-
-        // Usuarios
-        if (url === '/users' && method === 'GET') {
-            return await window.electronAPI.listUsers();
-        }
-        if (url === '/users/current' && method === 'GET') {
-            return await window.electronAPI.getCurrentUser();
-        }
-        if (url === '/users/create' && method === 'POST') {
-            return await window.electronAPI.createUser(body);
-        }
-        if (url === '/users/select' && method === 'POST') {
-            return await window.electronAPI.setCurrentUser(body);
-        }
+        if (method === 'GET' && (m = basePath.match(/^\/bolsa\/ticker-history\/(.+)$/)))
+            return api.bolsaGetTickerHistory(decodeURIComponent(m[1]));
 
         throw new Error(`Ruta no implementada: ${method} ${url}`);
     }
@@ -387,3 +248,5 @@ window.API = {
 window.fetch = window.API.fetch.bind(window.API);
 
 console.log('✅ API Adapter cargado - fetch redirigido a IPC');
+
+} // end Electron mode

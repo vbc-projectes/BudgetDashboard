@@ -15,6 +15,9 @@ class SubHuchaService {
         if (!nombre || !desde || !hasta) {
             throw new Error('nombre, desde y hasta son requeridos');
         }
+        if (String(desde) > String(hasta)) {
+            throw new Error('desde no puede ser posterior a hasta');
+        }
         await dbRun(db, `
             INSERT INTO sub_huchas (nombre, aportacion_inicial, aportacion_mensual, desde, hasta)
             VALUES (?, ?, ?, ?, ?)
@@ -25,6 +28,9 @@ class SubHuchaService {
         const { id, nombre, aportacion_inicial, aportacion_mensual, desde, hasta } = data;
         if (!id || !nombre || !desde || !hasta) {
             throw new Error('id, nombre, desde y hasta son requeridos');
+        }
+        if (String(desde) > String(hasta)) {
+            throw new Error('desde no puede ser posterior a hasta');
         }
         await dbRun(db, `
             UPDATE sub_huchas SET nombre = ?, aportacion_inicial = ?, aportacion_mensual = ?, desde = ?, hasta = ?
@@ -54,6 +60,7 @@ class SubHuchaService {
         if (!sub_hucha_id || !fecha || !monto || isNaN(monto)) {
             throw new Error('sub_hucha_id, fecha y monto son requeridos');
         }
+        if (parseFloat(monto) <= 0) throw new Error('El monto debe ser mayor que cero');
         await dbRun(db, `
             INSERT INTO sub_huchas_puntuales (sub_hucha_id, fecha, descripcion, monto)
             VALUES (?, ?, ?, ?)
@@ -86,10 +93,11 @@ class SubHuchaService {
         if (refDate < desdeDate) return 0;
 
         const limiteDate = refDate < hastaDate ? refDate : hastaDate;
-        const meses = Math.max(0,
+        const MAX_MONTHS = 1200; // 100 years cap — prevents memory exhaustion on bad data
+        const meses = Math.min(MAX_MONTHS, Math.max(0,
             (limiteDate.getFullYear() - desdeDate.getFullYear()) * 12 +
             (limiteDate.getMonth() - desdeDate.getMonth())
-        );
+        ));
 
         const totalMensual = meses * mensual;
 
