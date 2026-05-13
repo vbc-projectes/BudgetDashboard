@@ -215,7 +215,7 @@
         const selectImporte = document.getElementById('selectImporte');
 
         if (!selectFecha || !selectConcepto || !selectImporte) {
-            showAlert('❌ ' + t('importacion.errorMapeoNoEncontrado'), 'error');
+            showAlert(t('importacion.errorMapeoNoEncontrado'), 'error');
             return false;
         }
 
@@ -224,7 +224,7 @@
         const importe = selectImporte.value;
 
         if (!fecha || !concepto || !importe) {
-            showAlert('⚠️ ' + t('importacion.errorColumnasRequeridas'), 'error');
+            showAlert(t('importacion.errorColumnasRequeridas'), 'error');
             return false;
         }
 

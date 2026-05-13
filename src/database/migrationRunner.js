@@ -92,8 +92,15 @@ async function runMigrations() {
                 throw new Error(`Migración ${migration.filename} no tiene función 'up'`);
             }
 
-            await migrationModule.up(db, dbRun, dbGet, dbAll);
-            await recordMigration(migration.version, migration.name);
+            await dbRun(db, 'BEGIN');
+            try {
+                await migrationModule.up(db, dbRun, dbGet, dbAll);
+                await recordMigration(migration.version, migration.name);
+                await dbRun(db, 'COMMIT');
+            } catch (innerErr) {
+                await dbRun(db, 'ROLLBACK').catch(() => {});
+                throw innerErr;
+            }
             
             console.log(`   ✅ Completada: ${migration.version}_${migration.name}`);
         } catch (err) {

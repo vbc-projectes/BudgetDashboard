@@ -122,7 +122,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     importList: () => ipcRenderer.invoke('import-list'),
     importContent: (id) => ipcRenderer.invoke('import-content', id),
     importDelete: (id) => ipcRenderer.invoke('import-delete', id),
-    importSave: (data) => ipcRenderer.invoke('import-save', data)
+    importSave: (data) => ipcRenderer.invoke('import-save', data),
+
+    // ============= BOLSA / INVERSIONES =============
+    bolsaEnsureSetup: () => ipcRenderer.invoke('bolsa-ensure-setup'),
+    bolsaGetOperaciones: () => ipcRenderer.invoke('bolsa-get-operaciones'),
+    bolsaAddOperacion: (data) => ipcRenderer.invoke('bolsa-add-operacion', data),
+    bolsaUpdateOperacion: (data) => ipcRenderer.invoke('bolsa-update-operacion', data),
+    bolsaDeleteOperacion: (id) => ipcRenderer.invoke('bolsa-delete-operacion', id),
+    bolsaGetDividendos: () => ipcRenderer.invoke('bolsa-get-dividendos'),
+    bolsaGetPosiciones: () => ipcRenderer.invoke('bolsa-get-posiciones'),
+    bolsaGetResumen: () => ipcRenderer.invoke('bolsa-get-resumen'),
+    bolsaGetEstadisticas: () => ipcRenderer.invoke('bolsa-get-estadisticas'),
+    bolsaGetTickerHistory: (ticker) => ipcRenderer.invoke('bolsa-get-ticker-history', ticker),
+    bolsaSyncDividendos: () => ipcRenderer.invoke('bolsa-sync-dividendos')
 });
 
 console.log('✅ Preload script cargado - API expuesta');

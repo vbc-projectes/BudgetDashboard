@@ -14,7 +14,8 @@ const TAB_TEMPLATE_PATHS = {
     impuestos: 'Pestañas/impuestos/impuestos.html',
     importacionBancaria: 'Pestañas/importacionBancaria/importacionBancaria.html',
     dashboard: 'Pestañas/dashboard/dashboard.html',
-    hucha: 'Pestañas/hucha/hucha.html'
+    hucha: 'Pestañas/hucha/hucha.html',
+    inversiones: 'Pestañas/inversiones/inversiones.html'
 };
 
 function setActiveTabButton(tabId) {
@@ -138,6 +139,17 @@ async function loadTab(tabId) {
         // Restaurar scroll ANTES de cambiar el contenido
         const savedPosition = scrollPositions[tabId] || 0;
         
+        // Run any tab-level cleanup before tearing down the DOM
+        if (typeof window.__tabCleanup === 'function') {
+            try { window.__tabCleanup(); } catch (_) {}
+            window.__tabCleanup = null;
+        }
+
+        // Disconnect stale MutationObservers from column-filter searchers
+        if (typeof window.__tableSearchCleanup === 'function') {
+            try { window.__tableSearchCleanup(); } catch (_) {}
+        }
+
         // Cambiar contenido mientras está oculto
         tabContent.innerHTML = html;
 
@@ -164,15 +176,16 @@ async function loadTab(tabId) {
         if (tabId === 'hucha') {
             if (typeof cargarHucha !== 'undefined') await cargarHucha();
         }
+        if (tabId === 'inversiones') {
+            if (typeof initInversiones !== 'undefined') await initInversiones();
+        }
 
         // Añadir filtros por columna a las tablas de la pestaña.
         initTableSearchers(tabContent);
         
-        // Restaurar scroll después de cargar todo
-        window.scrollTo({ top: savedPosition, behavior: 'instant' });
-        
-        // Mostrar con transición después de que todo esté listo
+        // Restaurar scroll y mostrar con transición después de que el layout esté completo
         requestAnimationFrame(() => {
+            window.scrollTo({ top: savedPosition, behavior: 'instant' });
             tabContent.style.opacity = '1';
         });
 

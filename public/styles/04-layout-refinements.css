@@ -1,3 +1,95 @@
+/* ==================== INVERSIONES — KPI CARDS ==================== */
+.kpi-card {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 4px;
+    background: var(--bg-white, #fff);
+    border: 1px solid var(--border-light, #e0e0e0);
+    border-radius: var(--border-radius, 8px);
+    padding: 10px 16px;
+    min-width: 110px;
+}
+
+.kpi-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary, #475569);
+}
+
+.kpi-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary, #333);
+}
+
+/* Period selector buttons inside chart cards */
+.inv-period-btn {
+    padding: 5px 12px !important;
+    min-height: 30px !important;
+    font-size: 0.82rem !important;
+    background: #f3f4f6 !important;
+    color: var(--text-secondary, #475569) !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 6px !important;
+    font-weight: 600;
+}
+
+.inv-period-btn:hover {
+    background: #e5e7eb !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+.inv-period-btn.active {
+    background: var(--gradient-primary) !important;
+    color: #fff !important;
+    border-color: var(--primary, #16a34a) !important;
+    box-shadow: 0 2px 6px rgba(22, 163, 74, 0.3) !important;
+}
+
+/* Chart section cards — white background */
+.inv-chart-card {
+    background: #fff;
+    border: 1px solid var(--border-light, #e0e0e0);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.inv-chart-card h4 {
+    margin: 0 0 12px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-secondary, #475569);
+}
+
+/* Ranking tables inside Resumen subtab */
+.res-ranking-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+.res-ranking-table th {
+    padding: 6px 8px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: var(--text-tertiary, #64748b);
+    border-bottom: 1px solid var(--border-light, #e0e0e0);
+    white-space: nowrap;
+}
+.res-ranking-table td {
+    padding: 7px 8px;
+    border-bottom: 1px solid #f3f4f6;
+    vertical-align: top;
+}
+.res-ranking-table tr:last-child td { border-bottom: none; }
+.res-ranking-table tr:hover td { background: #f8f9fa; }
+
 /* ==================== LAYOUT SIDEBAR APP ==================== */
 .app-layout {
     min-height: 100vh;

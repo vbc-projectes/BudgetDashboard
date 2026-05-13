@@ -81,15 +81,15 @@ async function cargarHucha() {
         },
         
         async loadData() {
-            const [resHucha, resCR, resAssets] = await Promise.all([
+            const [resHucha, resCR, resBolsaPos] = await Promise.all([
                 fetch('/hucha'),
                 fetch('/cuenta_remunerada'),
-                fetch('/assets')
+                fetch('/bolsa/posiciones')
             ]);
 
             const data = resHucha.ok ? await resHucha.json() : [];
             const cuentasRemuneradas = resCR.ok ? await resCR.json() : [];
-            const assets = resAssets.ok ? await resAssets.json() : [];
+            const bolsaPosiciones = resBolsaPos.ok ? await resBolsaPos.json() : [];
             const now = new Date();
             const mesActual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
             
@@ -129,26 +129,26 @@ async function cargarHucha() {
                     this.tbody.appendChild(tr);
                 });
 
-            // Calcular total de assets en paralelo para mejorar tiempos de carga.
+            // Calcular valor actual de posiciones bolsa en paralelo
             const totalAssets = (await Promise.all(
-                assets.map(async (asset) => {
+                bolsaPosiciones.map(async (pos) => {
                     try {
-                        const currentPrice = await window.getAssetPrice(asset.ticker);
-                        return currentPrice ? (asset.shares * currentPrice) : 0;
-                    } catch (e) {
-                        console.error(`Error obteniendo precio para ${asset.ticker}:`, e);
-                        return 0;
+                        const currentPrice = await window.getAssetPrice(pos.ticker);
+                        const appliedPrice = Number.isFinite(currentPrice) ? currentPrice : (Number(pos.precio_medio) || 0);
+                        return (Number(pos.cantidad) || 0) * appliedPrice;
+                    } catch (_) {
+                        return Number(pos.coste_total) || 0;
                     }
                 })
             )).reduce((acc, value) => acc + (Number(value) || 0), 0);
 
-            // Agregar fila sumada de assets si hay
+            // Agregar fila con valor actual de la cartera de inversiones
             if (totalAssets > 0) {
                 const trAssets = document.createElement('tr');
                 trAssets.dataset.auto = 'true';
-                const assetsLabel = this.t('ingresos.assets', 'Assets');
+                const assetsLabel = this.t('ingresos.assets', 'Cartera inversiones');
                 trAssets.innerHTML = `
-                    <td>${assetsLabel} (sumado)</td>
+                    <td>${assetsLabel}</td>
                     <td><strong>${this.formatCurrency(totalAssets)}</strong></td>
                     <td>—</td>
                 `;

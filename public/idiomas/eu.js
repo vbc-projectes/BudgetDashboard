@@ -286,7 +286,13 @@ TRADUCCIONES.eu = {
             errorSinDatos: 'Ez dago daturik gordetzeko',
             guardandoArchivo: 'Fitxategia gordetzen...',
             errorGuardandoArchivo: 'Akatsa fitxategia gordetzerakoan',
-            exitoArchivoGuardado: 'Fitxategia arrakastaz gorde da'
+            exitoArchivoGuardado: 'Fitxategia arrakastaz gorde da',
+            errorPresetMapeoVacio: 'Birkarga baliodun bat osatu behar duzu aurre-konfigurazioa gordetzeko',
+            nombrePresetMapeo: 'Mapatze aurre-konfigurazioaren izena:',
+            presetBancoDefault: 'Bankuaren aurre-konfigurazioa',
+            confirmarEliminarPreset: 'Mapatze aurre-konfigurazioa ezabatu?',
+            sinErroresValidacion: 'Balioztapen erroreak ez',
+            errorNoFilasValidas: 'Ez dago baliozko lerrorik jarraitzeko. Egiaztatu balioztapen panela.'
         },
 
         // ===== DASHBOARD =====
@@ -338,7 +344,9 @@ TRADUCCIONES.eu = {
             ingresosReales: 'Diru-sarrera Errealak',
             gastosReales: 'Gastu Errealak',
             ahorrosReales: 'Aurrezki Errealak',
-            realesSuffix: 'Erreal'
+            realesSuffix: 'Erreal',
+            periodoActivo: 'Aldi aktiboa',
+            ratioAhorro: 'Aurrezki tasa'
         },
 
         // ===== CATEGORÍAS =====
@@ -481,7 +489,14 @@ TRADUCCIONES.eu = {
             companyRequerido: 'Enpresa beharrezkoa',
             tickerRequerido: 'Ticker beharrezkoa',
             numeroAccionesInvalido: 'Akzio kopuru baliogabea',
-            precioCompraInvalidoAlt: 'Erosketa prezioa baliogabea'
+            precioCompraInvalidoAlt: 'Erosketa prezioa baliogabea',
+            verHistorico: 'Ikusi historia',
+            historicalChart: 'Historia',
+            precioEur: 'Prezioa (€)',
+            fechaEje: 'Data',
+            cargandoPrecio: 'Kargatzen...',
+            errorCargarDatos: 'Errorea datuak kargatzean',
+            errorGuardar: 'Errorea gordetzean'
         },
 
         // ===== IMPUESTOS =====
@@ -598,6 +613,96 @@ TRADUCCIONES.eu = {
             eliminar: 'Ziur elementu hau ezabatu nahi duzula?',
             cancelar: 'Eragiketa hau ezeztatu nahi duzu?',
             salirSinGuardar: 'Aldaketak gorde gabe irten nahi duzu?'
+        },
+
+        // ===== INVERSIONES =====
+        inversiones: {
+            titulo: 'Inbertsioak',
+            tabs: {
+                activos: 'Posizioak',
+                cartera: 'Zorroa',
+                operaciones: 'Eragiketak',
+                dividendos: 'Dibidenduak',
+                resumen: 'Laburpena'
+            },
+            posicionesAbiertas: 'Posizio irekiak',
+            actualizarPrecios: 'Prezioak eguneratu',
+            notaPosiciones: 'Posizioak automatikoki kalkulatzen dira erregistratutako eragiketetatik.',
+            kpi: {
+                invertido: 'Inbertiua',
+                valorActual: 'Egungo balioa',
+                pnlLatente: 'P&L latentea',
+                dividendosNetos: 'Dibidendoak garbi',
+                comisiones: 'Komisioak',
+                rentabilidadTotal: 'Errentagarritasun osoa',
+                gpRealizado: 'G/I gauzatua',
+                rendimientoTotal: 'Errendimendu osoa €',
+                totalOps: 'Eragiketa guztiak',
+                compras: 'Erosketak',
+                ventas: 'Salmentak',
+                tickersUnicos: 'Ticker bakarrak',
+                gpTotalVentas: 'G/I salmenta guztiak'
+            },
+            distribucionCartera: 'Zorroa banatzea',
+            sinPosiciones: 'Posiziorik gabe',
+            rendimientoPorActivo: 'Errendimendua aktiboko (P&L €)',
+            sinDatosPnl: 'P&L daturik gabe',
+            rendimientoHistorico: 'Portfolio-aren errendimendu historikoa',
+            rendimientoEnPeriodo: 'errendimendua hautatutako aldian',
+            cargandoHistorico: 'Datu historikoak kargatzen...',
+            sinDatosHistoricos: 'Datu historikorik ez. Gehitu eragiketak errendimendua ikusteko.',
+            operaciones: 'Eragiketak',
+            importarCSV: 'CSV inportatu',
+            compra: 'Erosketa',
+            venta: 'Salmenta',
+            dividendosCobrados: 'Jasotako dibidenduak',
+            sincronizarYahoo: 'Yahoo-tik sinkronizatu',
+            notaDividendos: 'Dibidenduak automatikoki kalkulatzen dira ordainketa data bakoitzean zenituzten akzioen arabera.',
+            resumenOperaciones: 'Eragiketen laburpena',
+            mejoresVentasPct: '🏆 Salmenta onenak %',
+            peoresVentasPct: '💀 Salmenta txarrenak %',
+            mejoresVentasEur: 'Salmenta onenak €',
+            peoresVentasEur: 'Salmenta txarrenak €',
+            accionesMasMovidas: 'Akzio gehien mugituriko',
+            cerrarPosicion: 'Posizioa itxi',
+            notaCerrarPosicion: 'Emandako datuekin salmenta-eragiketa bat erregistratuko da.',
+            confirmarVenta: 'Salmenta baieztatzen du',
+            importarOperaciones: 'Eragiketak inportatu',
+            sinPosicionesAbiertas: 'Posizio irekiak ez. Gehitu erosketa eragiketak.',
+            sinOperaciones: 'Eragiketa erregistraturik ez',
+            sinDividendos: 'Ez dago dibidendurik. Sakatu "Sinkronizatu" Yahoo Finance-tik lortzeko.',
+            sincronizando: 'Sinkronizatzen…',
+            sinDividendosEncontrados: 'Ez da dibidendurik aurkitu',
+            posicionCerrada: '{ticker} posizioa itxita',
+            camposObligatorios: 'Tickerra, data, kopurua eta prezioa derrigorrezkoak dira.',
+            confirmarEliminarOp: 'Eragiketa hau ezabatu?',
+            sinOperacionesSeleccionadas: 'Ez dago eragiketarik hautatuta.',
+            operacionesImportadas: '{n} eragiketa inportatua ongi',
+            operacionesFallaron: '{n} eragiketak huts egin du inportatzean',
+            sinOperacionesEnArchivo: 'Ez da erosketa/salmenta eragiketarik aurkitu fitxategian.',
+            sinDatos: 'Daturik ez',
+            cargando: 'Kargatzen…'
+        },
+
+        // ===== BOLSA =====
+        bolsa: {
+            titulo: 'Burtsa',
+            tabs: {
+                cartera: 'Zorroa',
+                operaciones: 'Eragiketak',
+                dividendos: 'Dibidenduak'
+            },
+            resumenCartera: 'Zorroaren laburpena',
+            operaciones: 'Eragiketak',
+            dividendos: 'Dibidenduak',
+            obteniendoPrecios: 'Prezioak eskuratzen...',
+            sinPosiciones: 'Posizio irekiak ez',
+            sinOperaciones: 'Eragiketa erregistraturik ez',
+            sinDividendos: 'Dibidendorik erregistratu gabe',
+            camposObligatorios: 'Tickerra, data, kopurua eta prezioa derrigorrezkoak dira.',
+            camposDividendoObligatorios: 'Tickerra, data eta zenbateko gordina derrigorrezkoak dira.',
+            confirmarEliminarOp: 'Eragiketa hau ezabatu?',
+            confirmarEliminarDiv: 'Dibidendoa ezabatu?'
         }
     };
 

@@ -2,6 +2,7 @@
 let periodoActual = '1mes';
 let resumenData = null;
 let cargandoResumen = false;
+let _actualizarResumenController = null; // AbortController for inner detail fetches
 
 function isCuentaRemuneradaActiva(cr, mesActual) {
     if (!cr || !cr.desde || !cr.hasta) return false;
@@ -67,6 +68,12 @@ async function cargarResumenPeriodos() {
         resumenData = await res.json();
         
             async function actualizarResumen(periodo) {
+            // Cancel any in-flight detail fetches from a previous period/user
+            if (_actualizarResumenController) {
+                _actualizarResumenController.abort();
+            }
+            _actualizarResumenController = new AbortController();
+            const signal = _actualizarResumenController.signal;
             const stats = await getStatsForPeriodo(periodo);
             if (!stats) {
                 console.warn(`⚠️ Datos no disponibles para período: ${periodo}`);
@@ -94,17 +101,17 @@ async function cargarResumenPeriodos() {
                 // Obtener total hucha
                 if (hucha) {
                     try {
-                        const [resHucha, resCR, resAssets, resSubHuchas, resSubHuchasPunt] = await Promise.all([
-                            fetch('/hucha'),
-                            fetch('/cuenta_remunerada'),
-                            fetch('/assets'),
-                            fetch('/sub_huchas'),
-                            fetch(`/sub_huchas/total?mes=${getReferenceMonthForPeriod(periodo)}`)
+                        const [resHucha, resCR, resBolsaPos, resSubHuchas, resSubHuchasPunt] = await Promise.all([
+                            fetch('/hucha', { signal }),
+                            fetch('/cuenta_remunerada', { signal }),
+                            fetch('/bolsa/posiciones', { signal }),
+                            fetch('/sub_huchas', { signal }),
+                            fetch(`/sub_huchas/total?mes=${getReferenceMonthForPeriod(periodo)}`, { signal })
                         ]);
 
                         const dataHucha = resHucha.ok ? await resHucha.json() : [];
                         const dataCR = resCR.ok ? await resCR.json() : [];
-                        const dataAssets = resAssets.ok ? await resAssets.json() : [];
+                        const bolsaPosiciones = resBolsaPos.ok ? await resBolsaPos.json() : [];
                         const subHuchasList = resSubHuchas.ok ? await resSubHuchas.json() : [];
                         const subHuchasTotalData = resSubHuchasPunt.ok ? await resSubHuchasPunt.json() : { total: 0 };
 
@@ -115,16 +122,15 @@ async function cargarResumenPeriodos() {
                             .filter(cr => isCuentaRemuneradaActiva(cr, mesReferencia))
                             .reduce((acc, cr) => acc + calcularSaldoCuentaRemunerada(cr, mesReferencia), 0);
 
+                        // Valor actual de las posiciones abiertas (nuevo sistema bolsa)
                         let totalAssets = 0;
-                        for (const asset of dataAssets) {
+                        for (const pos of bolsaPosiciones) {
                             try {
-                                const shares = Number(asset.shares) || 0;
-                                const fallbackPrice = Number(asset.purchase_price) || 0;
-                                const currentPrice = await window.getAssetPrice(asset.ticker);
-                                const appliedPrice = Number.isFinite(currentPrice) ? currentPrice : fallbackPrice;
-                                totalAssets += shares * appliedPrice;
+                                const currentPrice = await window.getAssetPrice(pos.ticker);
+                                const appliedPrice = Number.isFinite(currentPrice) ? currentPrice : (Number(pos.precio_medio) || 0);
+                                totalAssets += (Number(pos.cantidad) || 0) * appliedPrice;
                             } catch (e) {
-                                console.error(`Error obteniendo precio para ${asset.ticker}:`, e);
+                                totalAssets += (Number(pos.coste_total) || 0);
                             }
                         }
 
@@ -163,7 +169,14 @@ async function cargarResumenPeriodos() {
                                     }
                                     const row = document.createElement('div');
                                     row.className = 'inicio-sub-hucha-row';
-                                    row.innerHTML = `<span class="inicio-sub-hucha-name">${sh.nombre}</span><span class="inicio-sub-hucha-amount">${formatearEuro(saldo)}</span>`;
+                                    const nameSpan = document.createElement('span');
+                                    nameSpan.className = 'inicio-sub-hucha-name';
+                                    nameSpan.textContent = sh.nombre;
+                                    const amountSpan = document.createElement('span');
+                                    amountSpan.className = 'inicio-sub-hucha-amount';
+                                    amountSpan.textContent = formatearEuro(saldo);
+                                    row.appendChild(nameSpan);
+                                    row.appendChild(amountSpan);
                                     subHuchasListEl.appendChild(row);
                                 }
                             }
@@ -192,7 +205,7 @@ async function cargarResumenPeriodos() {
                     };
 
                     const now = Date.now();
-                    const portfolioCacheKey = `${activeUser || 'anon'}:${periodo}`;
+                    const portfolioCacheKey = `${activeUser || 'anon'}`;
                     if (portfolioResultCache && portfolioResultCache.key === portfolioCacheKey && (now - portfolioResultCache.timestamp) < PORTFOLIO_CACHE_TTL) {
                         updatePortfolioCard(
                             portfolioResultCache.textContent,
@@ -201,42 +214,42 @@ async function cargarResumenPeriodos() {
                         );
                     } else {
                         try {
-                            const resAssets = await fetch('/assets');
-                            if (resAssets.ok) {
-                                const assets = await resAssets.json();
+                            const [resPosiciones, resResumen] = await Promise.all([
+                                fetch('/bolsa/posiciones'),
+                                fetch('/bolsa/resumen')
+                            ]);
+                            const posiciones = resPosiciones.ok ? await resPosiciones.json() : [];
+                            const resumen = resResumen.ok ? await resResumen.json() : {};
 
-                                if (assets.length === 0) {
-                                    portfolioResultCache = { key: portfolioCacheKey, textContent: '€0 (0%)', color: '', totalValue: 0, timestamp: now };
-                                    updatePortfolioCard('€0 (0%)', '', 0);
-                                } else {
-                                    let totalInvested = 0;
-                                    let currentValue = 0;
-
-                                    for (const asset of assets) {
-                                        const shares = Number(asset.shares) || 0;
-                                        const purchasePrice = Number(asset.purchase_price) || 0;
-                                        const invested = shares * purchasePrice;
-                                        totalInvested += invested;
-                                        try {
-                                            const currentPrice = await window.getAssetPrice(asset.ticker);
-                                            const appliedPrice = Number.isFinite(currentPrice) ? currentPrice : purchasePrice;
-                                            currentValue += shares * appliedPrice;
-                                        } catch (e) {
-                                            currentValue += invested;
-                                        }
-                                    }
-
-                                    const profit = currentValue - totalInvested;
-                                    const profitPercent = totalInvested > 0 ? (profit / totalInvested) * 100 : 0;
-                                    const sign = profit >= 0 ? '+' : '';
-                                    const textContent = `${sign}${formatearEuro(profit)} (${sign}${profitPercent.toFixed(2)}%)`;
-                                    const color = profit >= 0 ? 'var(--success)' : 'var(--danger)';
-
-                                    portfolioResultCache = { key: portfolioCacheKey, textContent, color, totalValue: currentValue, timestamp: now };
-                                    updatePortfolioCard(textContent, color, currentValue);
-                                }
-                            } else {
+                            if (!posiciones.length && !resumen.ganancia_realizada && !resumen.total_dividendos) {
+                                portfolioResultCache = { key: portfolioCacheKey, textContent: '€0 (0%)', color: '', totalValue: 0, timestamp: now };
                                 updatePortfolioCard('€0 (0%)', '', 0);
+                            } else {
+                                // Calcular valor actual de posiciones abiertas
+                                let totalValor = 0;
+                                await Promise.all(posiciones.map(async pos => {
+                                    try {
+                                        const currentPrice = await window.getAssetPrice(pos.ticker);
+                                        const appliedPrice = Number.isFinite(currentPrice) ? currentPrice : (Number(pos.precio_medio) || 0);
+                                        totalValor += (Number(pos.cantidad) || 0) * appliedPrice;
+                                    } catch (_) {
+                                        totalValor += Number(pos.coste_total) || 0;
+                                    }
+                                }));
+
+                                const invested = Number(resumen.total_invertido) || 0;
+
+                                // P&L latente: valor de mercado actual vs coste de posiciones abiertas
+                                const pnlLatente = totalValor - invested;
+                                const rendTotal  = pnlLatente;
+                                const rentPct    = invested > 0 ? (pnlLatente / invested) * 100 : 0;
+
+                                const sign = rendTotal >= 0 ? '+' : '';
+                                const textContent = `${sign}${formatearEuro(rendTotal)} (${(rentPct >= 0 ? '+' : '')}${rentPct.toFixed(2)}%)`;
+                                const color = rendTotal >= 0 ? 'var(--success)' : 'var(--danger)';
+
+                                portfolioResultCache = { key: portfolioCacheKey, textContent, color, totalValue: totalValor, timestamp: now };
+                                updatePortfolioCard(textContent, color, totalValor);
                             }
                         } catch (e) {
                             console.error('Error calculando rendimiento del portfolio:', e);
@@ -305,7 +318,21 @@ async function cargarResumenPeriodos() {
 
     } catch (error) {
 
+        if (error && error.name === 'AbortError') return; // cancelled — do not show error
         console.error('❌ Error cargando resumen de períodos:', error);
+
+        // Notify the user that data could not be loaded
+        if (typeof mostrarNotificacion === 'function') {
+            mostrarNotificacion('Error cargando los datos del resumen. Reintentando…', 'error');
+        } else {
+            const banner = document.getElementById('resumen-error-banner');
+            if (banner) {
+                banner.textContent = 'Error cargando datos. Reintentando en 5 s…';
+                banner.style.display = 'block';
+                setTimeout(() => { banner.style.display = 'none'; }, 5000);
+            }
+        }
+
         // Mostrar valores por defecto si hay error
         const ingresos = document.getElementById('total-ingresos');
         const gastos = document.getElementById('total-gastos');

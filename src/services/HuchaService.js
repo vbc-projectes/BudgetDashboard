@@ -29,9 +29,10 @@ class HuchaService {
     async add(data) {
         const { concepto, cantidad } = data;
         
-        if (!concepto || !cantidad || isNaN(cantidad)) {
+        if (!concepto || cantidad === undefined || cantidad === null || isNaN(cantidad)) {
             throw new Error('Datos inválidos: concepto y cantidad son requeridos');
         }
+        if (parseFloat(cantidad) <= 0) throw new Error('La cantidad debe ser mayor que cero');
         
         await dbRun(db, `
             INSERT INTO ${this.tableName} (concepto, cantidad) 
@@ -47,9 +48,10 @@ class HuchaService {
     async update(data) {
         const { id, concepto, cantidad } = data;
         
-        if (!id || !concepto || !cantidad || isNaN(cantidad)) {
+        if (!id || !concepto || cantidad === undefined || cantidad === null || isNaN(cantidad)) {
             throw new Error('Datos inválidos: id, concepto y cantidad son requeridos');
         }
+        if (parseFloat(cantidad) <= 0) throw new Error('La cantidad debe ser mayor que cero');
         
         await dbRun(db, `
             UPDATE ${this.tableName} 

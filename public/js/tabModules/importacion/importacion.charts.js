@@ -65,7 +65,7 @@
                 }
             });
         } catch (error) {
-            showAlert('❌ ' + t('importacion.errorGraficoCategoria') + ': ' + error.message);
+            showAlert(t('importacion.errorGraficoCategoria') + ': ' + error.message);
         }
     }
 
@@ -115,7 +115,7 @@
                 tbody.appendChild(tr);
             });
         } catch (error) {
-            showAlert('❌ ' + t('importacion.errorGraficoIngresoVsGasto') + ': ' + error.message);
+            showAlert(t('importacion.errorGraficoIngresoVsGasto') + ': ' + error.message);
         }
     }
 
@@ -169,7 +169,7 @@
                 }
             });
         } catch (error) {
-            showAlert('❌ ' + t('importacion.errorGraficoEvolucionSaldo') + ': ' + error.message);
+            showAlert(t('importacion.errorGraficoEvolucionSaldo') + ': ' + error.message);
         }
     }
 
@@ -213,7 +213,7 @@
                 }
             });
         } catch (error) {
-            showAlert('❌ ' + t('importacion.errorGraficoMovimientosPorMes') + ': ' + error.message);
+            showAlert(t('importacion.errorGraficoMovimientosPorMes') + ': ' + error.message);
         }
     }
 

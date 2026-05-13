@@ -287,7 +287,13 @@ TRADUCCIONES.ca = {
             errorSinDatos: 'No hi ha dades per guardar',
             guardandoArchivo: 'Guardant arxiu...',
             errorGuardandoArchivo: 'Error guardant arxiu',
-            exitoArchivoGuardado: 'Arxiu guardat correctament'
+            exitoArchivoGuardado: 'Arxiu guardat correctament',
+            errorPresetMapeoVacio: 'Has de completar un mapeig vàlid abans de desar el preset',
+            nombrePresetMapeo: 'Nom del preset de mapeig:',
+            presetBancoDefault: 'Preset banc',
+            confirmarEliminarPreset: 'Eliminar aquest preset de mapeig?',
+            sinErroresValidacion: 'Sense errors de validació',
+            errorNoFilasValidas: 'No hi ha files vàlides per continuar. Revisa el tauler de validació.'
         },
 
         // ===== DASHBOARD =====
@@ -339,7 +345,9 @@ TRADUCCIONES.ca = {
             ingresosReales: 'Ingressos reals',
             gastosReales: 'Despeses reals',
             ahorrosReales: 'Estalvis reals',
-            realesSuffix: 'Real'
+            realesSuffix: 'Real',
+            periodoActivo: 'Període actiu',
+            ratioAhorro: "Taxa d'estalvi"
         },
 
         // ===== CATEGORIES =====
@@ -484,7 +492,12 @@ TRADUCCIONES.ca = {
             numeroAccionesInvalido: 'Nombre d\'accions invàlid',
             precioCompraInvalidoAlt: 'Preu de compra invàlid',
             verHistorico: 'Veure històric',
-            historicalChart: 'Històric de'
+            historicalChart: 'Històric de',
+            precioEur: 'Preu (€)',
+            fechaEje: 'Data',
+            cargandoPrecio: 'Carregant...',
+            errorCargarDatos: 'Error en carregar les dades',
+            errorGuardar: 'Error en desar'
         },
 
         // ===== IMPOSTOS =====
@@ -615,5 +628,95 @@ TRADUCCIONES.ca = {
             eliminar: 'Estàs segur que vols eliminar aquest element?',
             cancelar: 'Vols cancel·lar aquesta operació?',
             salirSinGuardar: 'Vols sortir sense desar els canvis?'
+        },
+
+        // ===== INVERSIONS =====
+        inversiones: {
+            titulo: 'Inversions',
+            tabs: {
+                activos: 'Posicions',
+                cartera: 'Cartera',
+                operaciones: 'Operacions',
+                dividendos: 'Dividends',
+                resumen: 'Resum'
+            },
+            posicionesAbiertas: 'Posicions obertes',
+            actualizarPrecios: 'Actualitzar preus',
+            notaPosiciones: 'Les posicions es calculen automàticament a partir de les operacions registrades.',
+            kpi: {
+                invertido: 'Invertit',
+                valorActual: 'Valor actual',
+                pnlLatente: 'P&L latent',
+                dividendosNetos: 'Dividends nets',
+                comisiones: 'Comissions',
+                rentabilidadTotal: 'Rendibilitat total',
+                gpRealizado: 'G/P realitzat',
+                rendimientoTotal: 'Rendiment total €',
+                totalOps: 'Total operacions',
+                compras: 'Compres',
+                ventas: 'Vendes',
+                tickersUnicos: 'Tickers únics',
+                gpTotalVentas: 'G/P total vendes'
+            },
+            distribucionCartera: 'Distribució de cartera',
+            sinPosiciones: 'Sense posicions',
+            rendimientoPorActivo: 'Rendiment per actiu (P&L €)',
+            sinDatosPnl: 'Sense dades de P&L',
+            rendimientoHistorico: 'Rendiment històric del portfolio',
+            rendimientoEnPeriodo: 'rendiment en el període seleccionat',
+            cargandoHistorico: 'Carregant dades històriques...',
+            sinDatosHistoricos: 'Sense dades històriques. Afegeix operacions per veure el rendiment.',
+            operaciones: 'Operacions',
+            importarCSV: 'Importar CSV',
+            compra: 'Compra',
+            venta: 'Venda',
+            dividendosCobrados: 'Dividends cobrats',
+            sincronizarYahoo: 'Sincronitzar des de Yahoo',
+            notaDividendos: 'Els dividends es calculen automàticament segons les accions que tenies en cada data de pagament.',
+            resumenOperaciones: 'Resum d’operacions',
+            mejoresVentasPct: '🏆 Millors vendes per %',
+            peoresVentasPct: '💀 Pitjors vendes per %',
+            mejoresVentasEur: 'Millors vendes per €',
+            peoresVentasEur: 'Pitjors vendes per €',
+            accionesMasMovidas: 'Accions més mogudes',
+            cerrarPosicion: 'Tancar posició',
+            notaCerrarPosicion: 'Es registrarà una operació de venda amb les dades indicades.',
+            confirmarVenta: 'Confirmar venda',
+            importarOperaciones: 'Importar operacions',
+            sinPosicionesAbiertas: 'Sense posicions obertes. Afegeix operacions de compra.',
+            sinOperaciones: 'Sense operacions registrades',
+            sinDividendos: 'Sense dividends. Prem "Sincronitzar" per obtenir-los de Yahoo Finance.',
+            sincronizando: 'Sincronitzant…',
+            sinDividendosEncontrados: 'Sense dividends trobats',
+            posicionCerrada: 'Posició de {ticker} tancada',
+            camposObligatorios: 'Ticker, data, quantitat i preu són obligatoris.',
+            confirmarEliminarOp: 'Eliminar aquesta operació?',
+            sinOperacionesSeleccionadas: 'No hi ha operacions seleccionades.',
+            operacionesImportadas: '{n} operació(ns) importada(es) correctament',
+            operacionesFallaron: '{n} operació(ns) han fallat en importar',
+            sinOperacionesEnArchivo: 'No s’han trobat operacions de compra/venda al fitxer.',
+            sinDatos: 'Sense dades',
+            cargando: 'Carregant…'
+        },
+
+        // ===== BORSA =====
+        bolsa: {
+            titulo: 'Borsa',
+            tabs: {
+                cartera: 'Cartera',
+                operaciones: 'Operacions',
+                dividendos: 'Dividends'
+            },
+            resumenCartera: 'Resum de Cartera',
+            operaciones: 'Operacions',
+            dividendos: 'Dividends',
+            obteniendoPrecios: 'Obtenint preus...',
+            sinPosiciones: 'Sense posicions obertes',
+            sinOperaciones: 'Sense operacions registrades',
+            sinDividendos: 'Sense dividends registrats',
+            camposObligatorios: 'Ticker, data, quantitat i preu són obligatoris.',
+            camposDividendoObligatorios: 'Ticker, data i import brut són obligatoris.',
+            confirmarEliminarOp: 'Eliminar aquesta operació?',
+            confirmarEliminarDiv: 'Eliminar aquest dividend?'
         }
     };

@@ -4,6 +4,33 @@
  */
 
 const express = require('express');
+const db = require('../config/database');
+const { dbRun } = require('../utils/dbHelpers');
+
+/**
+ * Validate a single import item at the Express boundary.
+ * Mirrors the IPC-side validateImportItem in ipcHandlers.js.
+ */
+function validateImportItem(item) {
+    if (item.monto !== undefined && item.monto !== null) {
+        const monto = parseFloat(item.monto);
+        if (isNaN(monto) || monto <= 0) throw new Error(`monto inválido: ${item.monto}`);
+    }
+    if (item.fecha !== undefined && item.fecha !== null) {
+        const s = String(item.fecha);
+        if (!/^\d{4}-\d{2}(-\d{2})?$/.test(s)) throw new Error(`fecha inválida: ${item.fecha}`);
+        const parts = s.split('-');
+        const month = Number(parts[1]);
+        if (month < 1 || month > 12) throw new Error(`mes fuera de rango: ${item.fecha}`);
+        if (parts[2]) {
+            const day = Number(parts[2]);
+            if (day < 1 || day > 31) throw new Error(`día fuera de rango: ${item.fecha}`);
+        }
+    }
+    if (item.descripcion !== undefined && item.descripcion !== null) {
+        if (String(item.descripcion).length > 500) throw new Error('descripcion excede 500 caracteres');
+    }
+}
 
 /**
  * Create standard CRUD routes for a given entity type
@@ -33,7 +60,7 @@ function createEntityRoutes(entityName, puntualService, mensualService) {
     router.post(`/delete/${entityName}_puntual`, async (req, res) => {
         try {
             await puntualService.delete(req.body.id);
-            res.json({ ok: true });
+            res.json({ success: true });
         } catch (err) {
             res.status(400).json({ error: err.message });
         }
@@ -56,8 +83,12 @@ function createEntityRoutes(entityName, puntualService, mensualService) {
      */
     router.post(`/add/${entityName}_mensual`, async (req, res) => {
         try {
+            const { desde, hasta } = req.body || {};
+            if (desde && hasta && String(desde) > String(hasta)) {
+                return res.status(400).json({ error: 'desde no puede ser posterior a hasta' });
+            }
             await mensualService.add(req.body);
-            res.sendStatus(200);
+            res.json({ success: true });
         } catch (err) {
             res.status(400).json({ error: err.message });
         }
@@ -69,7 +100,7 @@ function createEntityRoutes(entityName, puntualService, mensualService) {
     router.post(`/delete/${entityName}_mensual`, async (req, res) => {
         try {
             await mensualService.delete(req.body.id);
-            res.json({ ok: true });
+            res.json({ success: true });
         } catch (err) {
             res.status(400).json({ error: err.message });
         }
@@ -89,40 +120,83 @@ function createEntityRoutes(entityName, puntualService, mensualService) {
 
     /**
      * Import multiple puntual entities (for bank import)
+     * Runs inside a single DB transaction — all succeed or all roll back.
      */
     router.post(`/import/${entityName}_puntual`, async (req, res) => {
+        const { datos } = req.body || {};
+        if (!Array.isArray(datos) || datos.length === 0) {
+            return res.status(400).json({ error: 'No hay datos para importar' });
+        }
+
+        const resultados = [];
+        let exitosos = 0;
+        let fallidos = 0;
+
+        await dbRun(db, 'BEGIN TRANSACTION');
         try {
-            const { datos } = req.body;
-            if (!Array.isArray(datos) || datos.length === 0) {
-                return res.status(400).json({ error: 'No hay datos para importar' });
-            }
-
-            const resultados = [];
             for (const item of datos) {
-                try {
-                    await puntualService.add(item);
-                    resultados.push({ ...item, ok: true });
-                } catch (err) {
-                    resultados.push({ ...item, ok: false, error: err.message });
-                }
+                validateImportItem(item);
+                await puntualService.add(item);
+                resultados.push({ ...item, ok: true });
+                exitosos++;
             }
-
-            const exitosos = resultados.filter(r => r.ok).length;
-            const fallidos = resultados.filter(r => !r.ok).length;
-
-            res.json({
-                success: true,
+            await dbRun(db, 'COMMIT');
+            res.json({ success: true, total: datos.length, exitosos, fallidos, detalles: resultados });
+        } catch (err) {
+            try { await dbRun(db, 'ROLLBACK'); } catch (_) {}
+            fallidos = datos.length - exitosos;
+            res.status(400).json({
+                success: false,
+                error: err.message,
                 total: datos.length,
                 exitosos,
                 fallidos,
                 detalles: resultados
             });
-        } catch (err) {
-            res.status(500).json({ error: err.message || 'Error en la importación' });
         }
     });
 
     return router;
 }
 
-module.exports = { createEntityRoutes };
+/**
+ * Create CRUD routes for a "reales" entity (puntual-only, no mensual variant)
+ * Used for gastos_reales and ingresos_reales (bank-imported records)
+ * @param {string} entityName - e.g. 'gasto_real'
+ * @param {PuntualService} puntualService
+ * @returns {express.Router}
+ */
+function createRealEntityRoutes(entityName, puntualService) {
+    const router = express.Router();
+
+    router.post(`/add/${entityName}`, async (req, res) => {
+        try {
+            await puntualService.add(req.body);
+            res.json({ success: true });
+        } catch (err) {
+            res.status(400).json({ error: err.message });
+        }
+    });
+
+    router.post(`/delete/${entityName}`, async (req, res) => {
+        try {
+            await puntualService.delete(req.body.id);
+            res.json({ success: true });
+        } catch (err) {
+            res.status(400).json({ error: err.message });
+        }
+    });
+
+    router.post(`/update/${entityName}`, async (req, res) => {
+        try {
+            await puntualService.update(req.body);
+            res.json({ success: true });
+        } catch (err) {
+            res.status(500).json({ error: err.message || 'Error al actualizar' });
+        }
+    });
+
+    return router;
+}
+
+module.exports = { createEntityRoutes, createRealEntityRoutes };

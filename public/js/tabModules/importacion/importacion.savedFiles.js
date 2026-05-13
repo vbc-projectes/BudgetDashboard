@@ -8,7 +8,7 @@
             const data = await response.json();
 
             if (!data.success) {
-                showAlert('❌ ' + t('importacion.errorCargandoArchivos') + ': ' + data.error, 'error');
+                showAlert(t('importacion.errorCargandoArchivos') + ': ' + data.error, 'error');
                 return;
             }
 
@@ -25,7 +25,7 @@
                 listadoArchivos.appendChild(crearElementoArchivo(archivo, { t, escapeHtml }));
             });
         } catch (error) {
-            showAlert('❌ ' + t('importacion.errorCargandoArchivos') + ': ' + error.message, 'error');
+            showAlert(t('importacion.errorCargandoArchivos') + ': ' + error.message, 'error');
         }
     }
 
@@ -112,7 +112,7 @@
         try {
             window.location.href = `/api/importacion/descargar/${archivoId}`;
         } catch (error) {
-            showAlert('❌ ' + t('importacion.errorDescargandoArchivo') + ': ' + error.message, 'error');
+            showAlert(t('importacion.errorDescargandoArchivo') + ': ' + error.message, 'error');
         }
     }
 
@@ -190,7 +190,7 @@
     async function guardarArchivoActual(nombre, ctx) {
         const { estadoImportacion, showAlert, showInfoToast, showErrorToast, t, cargarListadoArchivos } = ctx;
         if (!estadoImportacion.datosRaw || estadoImportacion.datosRaw.length === 0) {
-            showAlert('⚠️ ' + t('importacion.errorSinDatos'), 'info');
+            showAlert(t('importacion.errorSinDatos'), 'info');
             return;
         }
 

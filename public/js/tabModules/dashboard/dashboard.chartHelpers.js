@@ -8,6 +8,7 @@
         neto: null
     };
 
+    // Each entry: { root: ReactRoot, container: HTMLElement }
     const porcentajeReactRoots = {};
 
     function crearOpcionesGrafico(optComun, titulo, apilado, createLegendClickHandler) {
@@ -239,18 +240,26 @@
             h('div', { className: 'porcentajes-3d-legend' }, legendNodes)
         );
 
-        let root = porcentajeReactRoots[containerId];
-        if (!root) {
-            root = ReactDOM.createRoot(container);
-            porcentajeReactRoots[containerId] = root;
+        let entry = porcentajeReactRoots[containerId];
+        // If the DOM was rebuilt (tab reload), the stored container is a different node.
+        // Discard the stale root so we create a fresh one on the new container.
+        if (entry && entry.container !== container) {
+            try { entry.root.unmount(); } catch (_) {}
+            entry = null;
+            delete porcentajeReactRoots[containerId];
         }
-        root.render(appNode);
+        if (!entry) {
+            const root = ReactDOM.createRoot(container);
+            entry = { root, container };
+            porcentajeReactRoots[containerId] = entry;
+        }
+        entry.root.render(appNode);
 
         return {
             destroy() {
-                const existingRoot = porcentajeReactRoots[containerId];
-                if (existingRoot) {
-                    existingRoot.unmount();
+                const existingEntry = porcentajeReactRoots[containerId];
+                if (existingEntry) {
+                    try { existingEntry.root.unmount(); } catch (_) {}
                     delete porcentajeReactRoots[containerId];
                 } else {
                     container.innerHTML = '';

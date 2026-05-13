@@ -1,0 +1,24 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dashboardeconomic
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      # Persistent user data (SQLite databases + uploaded files)
+      - dashboard_data:/app/usuarios
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3000
+      USERS_ROOT: /app/usuarios
+      QUERY_LIMIT: ${QUERY_LIMIT:-2000}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+
+volumes:
+  dashboard_data:
+    driver: local

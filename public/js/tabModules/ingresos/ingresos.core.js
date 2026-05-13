@@ -1,9 +1,7 @@
 /**
  * Ingresos - Versión simplificada usando TransactionManager
- * Mantiene lógica específica: Assets, Cuenta Remunerada, campo bruto
+ * Mantiene lógica específica: Cuenta Remunerada, campo bruto
  */
-const ingresosAssetsModule = window.IngresosAssetsModule || {};
-let ingresosAssetsController = null;
 
 function cargarIngresosForm() {
     // Inicializar TransactionManager para ingresos puntuales, mensuales y cuenta remunerada
@@ -65,17 +63,6 @@ function cargarIngresosForm() {
     // Inicializar manager
     ingresosManager.init();
     ingresosRealesManager.init();
-
-    if (typeof ingresosAssetsModule.createAssetModule === 'function') {
-        ingresosAssetsController = ingresosAssetsModule.createAssetModule({
-            ingresosManager,
-            ingresosRealesManager,
-            showAlert,
-            showConfirm: (typeof showConfirm === 'function') ? showConfirm : window.showConfirm,
-            notifySuccess: window.notifySuccess,
-            cargarResumenPeriodos
-        });
-    }
 
     // ===== AGREGAR INGRESO PUNTUAL =====
     document.getElementById('btnAgregarIngresoPuntual').onclick = async () => {
@@ -208,7 +195,7 @@ function cargarIngresosForm() {
 
             if (!resCR.ok) {
                 const err = await resCR.json().catch(() => ({}));
-                return showAlert('Error al guardar: ' + (err.error || resCR.status));
+                return showAlert(ingresosManager.t('ingresos.errorGuardar', 'Error al guardar') + ': ' + (err.error || resCR.status));
             }
 
             document.getElementById('desdeCuentaRemunerada').value = '';
@@ -223,55 +210,6 @@ function cargarIngresosForm() {
             if (typeof cargarResumenPeriodos === 'function') cargarResumenPeriodos();
             if (typeof notifySuccess === 'function') {
                 notifySuccess(ingresosManager.t('mensajes.elementoCreado', 'Cuenta remunerada guardada'));
-            }
-        };
-    }
-
-    // ===== ASSETS (delegado a módulo) =====
-    async function cargarAssets() {
-        if (ingresosAssetsController && typeof ingresosAssetsController.cargarAssets === 'function') {
-            await ingresosAssetsController.cargarAssets();
-        }
-    }
-
-    function openSellModal(asset, currentPrice) {
-        if (ingresosAssetsController && typeof ingresosAssetsController.openSellModal === 'function') {
-            ingresosAssetsController.openSellModal(asset, currentPrice);
-        }
-    }
-
-    function updateSellCalculations(asset, salePrice) {
-        if (ingresosAssetsController && typeof ingresosAssetsController.updateSellCalculations === 'function') {
-            ingresosAssetsController.updateSellCalculations(asset, salePrice);
-        }
-    }
-
-    const btnAgregarAsset = document.getElementById('btnAgregarAsset');
-    if (btnAgregarAsset) {
-        btnAgregarAsset.onclick = async () => {
-            const company = document.getElementById('companyAsset').value;
-            const ticker = document.getElementById('tickerAsset').value;
-            const shares = parseFloat(document.getElementById('sharesAsset').value);
-            const purchase_price = parseFloat(document.getElementById('purchasePriceAsset').value);
-
-            if (!company) return showAlert(ingresosManager.t('ingresos.ingresaNombreCompania'));
-            if (!ticker) return showAlert(ingresosManager.t('ingresos.ingresaTicker'));
-            if (isNaN(shares) || shares <= 0) return showAlert(ingresosManager.t('ingresos.accionesInvalidas'));
-            if (isNaN(purchase_price) || purchase_price <= 0) return showAlert(ingresosManager.t('ingresos.precioCompraInvalido'));
-
-            await fetch('/add/asset', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ company, ticker, shares, purchase_price })
-            });
-
-            document.getElementById('companyAsset').value = '';
-            document.getElementById('tickerAsset').value = '';
-            document.getElementById('sharesAsset').value = '';
-            document.getElementById('purchasePriceAsset').value = '';
-            cargarAssets();
-            if (typeof notifySuccess === 'function') {
-                notifySuccess(ingresosManager.t('mensajes.elementoCreado', 'Asset guardado'));
             }
         };
     }
@@ -385,19 +323,4 @@ function cargarIngresosForm() {
             lbl.textContent = window.showOldIngresosReales ? textoOcultarReales : textoMostrarReales;
         });
     });
-
-    // Cargar Assets
-    cargarAssets();
-}
-
-async function openHistoryModal(ticker, company) {
-    if (ingresosAssetsController && typeof ingresosAssetsController.openHistoryModal === 'function') {
-        await ingresosAssetsController.openHistoryModal(ticker, company);
-    }
-}
-
-async function loadHistoricalChart(ticker, period = '1mo') {
-    if (ingresosAssetsController && typeof ingresosAssetsController.loadHistoricalChart === 'function') {
-        await ingresosAssetsController.loadHistoricalChart(ticker, period);
-    }
 }

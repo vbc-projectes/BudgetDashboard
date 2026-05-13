@@ -12,6 +12,8 @@ const PRICE_CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 const HISTORY_CACHE_DURATION = 30 * 60 * 1000; // 30 minutos
 const priceCache = new Map();
 const historicalCache = new Map();
+// Deduplicación de peticiones históricas en vuelo (evita llamadas paralelas duplicadas al mismo ticker)
+const historicalInFlight = new Map();
 
 // Control de ruido de logs para tickers inválidos/no disponibles
 const failedTickerLogCache = new Map();
@@ -215,6 +217,63 @@ function parseStooqNumeric(value) {
     return Number.isFinite(numeric) ? numeric : null;
 }
 
+const BROWSER_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Accept': 'application/json, text/plain, */*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Referer': 'https://finance.yahoo.com/',
+    'Origin': 'https://finance.yahoo.com'
+};
+
+/**
+ * Consulta el precio actual via Yahoo Finance v8 chart API directamente (sin yahoo-finance2).
+ * Más tolerante a bloqueos de cookies/GDPR que la librería.
+ */
+async function fetchYahooDirectQuote(ticker) {
+    try {
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=5d`;
+        const res = await fetch(url, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(8000) });
+        if (!res.ok) return null;
+        const data = await res.json();
+        const result = data?.chart?.result?.[0];
+        if (!result) return null;
+        const meta  = result.meta || {};
+        const price = meta.regularMarketPrice || meta.chartPreviousClose || meta.previousClose;
+        const currency = meta.currency || 'USD';
+        if (!price || price <= 0) return null;
+        return { candidate: ticker, quote: { currency }, marketPrice: price, source: 'yahoo-direct' };
+    } catch (_) {
+        return null;
+    }
+}
+
+/**
+ * Obtiene histórico via Yahoo Finance v8 chart API directamente.
+ */
+async function fetchYahooDirectHistorical(ticker, startDate, endDate) {
+    try {
+        const p1 = Math.floor(startDate.getTime() / 1000);
+        const p2 = Math.floor(endDate.getTime() / 1000);
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&period1=${p1}&period2=${p2}`;
+        const res = await fetch(url, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(10000) });
+        if (!res.ok) return null;
+        const data = await res.json();
+        const result = data?.chart?.result?.[0];
+        if (!result) return null;
+        const timestamps = result.timestamp || [];
+        const closes     = result.indicators?.quote?.[0]?.close || [];
+        const currency   = result.meta?.currency || 'USD';
+        if (!timestamps.length) return null;
+        const rows = timestamps
+            .map((ts, i) => ({ date: new Date(ts * 1000), close: closes[i] }))
+            .filter(r => r.close != null && Number.isFinite(r.close) && r.close > 0);
+        if (!rows.length) return null;
+        return { candidate: ticker, currency, data: rows };
+    } catch (_) {
+        return null;
+    }
+}
+
 async function fetchStooqQuote(ticker) {
     const candidates = buildStooqCandidates(ticker);
 
@@ -224,8 +283,10 @@ async function fetchStooqQuote(ticker) {
             const response = await fetch(url, {
                 headers: {
                     accept: 'text/csv,*/*;q=0.8',
-                    'user-agent': 'Mozilla/5.0'
-                }
+                    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'referer': 'https://stooq.com/'
+                },
+                signal: AbortSignal.timeout(8000)
             });
             if (!response.ok) {
                 continue;
@@ -272,8 +333,10 @@ async function fetchStooqHistorical(ticker, startDate, endDate) {
             const response = await fetch(url, {
                 headers: {
                     accept: 'text/csv,*/*;q=0.8',
-                    'user-agent': 'Mozilla/5.0'
-                }
+                    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'referer': 'https://stooq.com/'
+                },
+                signal: AbortSignal.timeout(10000)
             });
             if (!response.ok) {
                 continue;
@@ -327,9 +390,24 @@ async function fetchStooqHistorical(ticker, startDate, endDate) {
 
 async function quoteFirstAvailablePrice(ticker) {
     const candidates = buildTickerCandidates(ticker);
+    // Yahoo (directo + librería) solo para base + aliases explícitos.
+    // Los sufijos de bolsa (.AS, .L, .F…) se reservan para stooq, que conoce la moneda correcta.
+    // Esto evita que AMZN resuelva erróneamente a AMZN.AS (Amsterdam) cuando Yahoo bloquea .com
+    const basePlusAliases = new Set([
+        ticker.toUpperCase(),
+        ...(TICKER_ALIASES[ticker.toUpperCase()] || []).map(a => a.toUpperCase())
+    ]);
+    const yahooCandidates = candidates.filter(c => basePlusAliases.has(c));
     let hadInfrastructureError = false;
 
-    for (const candidate of candidates) {
+    // 1. Intento directo via Yahoo v8 chart API (más tolerante a bloqueos GDPR/crumb)
+    for (const candidate of yahooCandidates) {
+        const direct = await fetchYahooDirectQuote(candidate);
+        if (direct) return direct;
+    }
+
+    // 2. Intento via librería yahoo-finance2
+    for (const candidate of yahooCandidates) {
         try {
             const quote = await yahooFinance.quote(candidate);
             const marketPrice = extractQuoteMarketPrice(quote);
@@ -561,6 +639,22 @@ async function getHistoricalData(ticker, period = '1y') {
         return addCacheMetadata(freshCache.value, freshCache, 'cache-hit');
     }
 
+    // Deduplicar peticiones paralelas: si ya hay una en vuelo para el mismo clave, esperar su resultado
+    if (historicalInFlight.has(historyCacheKey)) {
+        return historicalInFlight.get(historyCacheKey);
+    }
+
+    const promise = _doFetchHistoricalData(normalizedTicker, period, historyCacheKey);
+    historicalInFlight.set(historyCacheKey, promise);
+    try {
+        return await promise;
+    } finally {
+        historicalInFlight.delete(historyCacheKey);
+    }
+}
+
+async function _doFetchHistoricalData(normalizedTicker, period, historyCacheKey) {
+
     console.log(`📊 [getHistoricalData] Ticker: ${normalizedTicker}, Período: ${period}`);
     
     try {
@@ -603,8 +697,28 @@ async function getHistoricalData(ticker, period = '1y') {
         let inferredCurrency = null;
         let hadInfrastructureError = false;
         const candidates = buildTickerCandidates(normalizedTicker);
+        // Yahoo solo para base + aliases explícitos (evitar resolución errónea a bolsas europeas)
+        const basePlusAliases = new Set([
+            normalizedTicker,
+            ...(TICKER_ALIASES[normalizedTicker] || []).map(a => a.toUpperCase())
+        ]);
+        const yahooCandidates = candidates.filter(c => basePlusAliases.has(c));
 
-        for (const candidate of candidates) {
+        // 1. Intento directo via Yahoo v8 chart API
+        for (const candidate of yahooCandidates) {
+            const direct = await fetchYahooDirectHistorical(candidate, startDate, endDate);
+            if (direct && direct.data.length > 0) {
+                result = direct.data;
+                finalTicker = direct.candidate;
+                inferredCurrency = direct.currency;
+                console.log(`✅ Histórico directo encontrado con ${candidate} (${direct.data.length} puntos)`);
+                break;
+            }
+        }
+
+        // 2. Intento via librería yahoo-finance2
+        if (!result) {
+        for (const candidate of yahooCandidates) {
             try {
                 console.log(`🔍 Intentando histórico con: ${candidate}`);
                 const historical = await yahooFinance.historical(candidate, queryOptions);
@@ -625,6 +739,7 @@ async function getHistoricalData(ticker, period = '1y') {
                     break;
                 }
             }
+        }
         }
 
         if (!result || !Array.isArray(result) || result.length === 0) {
@@ -707,4 +822,52 @@ async function getHistoricalData(ticker, period = '1y') {
     }
 }
 
-module.exports = { getAssetPrice, obtenerTasaCambio, getHistoricalData };
+/**
+ * Obtiene eventos de dividendos para un ticker desde una fecha de inicio.
+ * Returns: [{ date: 'YYYY-MM-DD', dividendPerShare: number (EUR) }]
+ */
+async function getDividendEvents(ticker, startDate) {
+    const normalizedTicker = String(ticker || '').trim().toUpperCase();
+    if (!normalizedTicker) return [];
+
+    const candidates = buildTickerCandidates(normalizedTicker);
+    const period1 = startDate instanceof Date ? startDate : new Date(startDate || '2000-01-01');
+    const period2 = new Date();
+
+    // Determine currency conversion rate once
+    let tasa = 1;
+    let sourceCurrency = 'USD';
+    try {
+        const quote = await yahooFinance.quote(normalizedTicker);
+        sourceCurrency = normalizeCurrencyCode(quote?.currency || 'USD') || 'USD';
+        tasa = sourceCurrency === 'EUR' ? 1 : await obtenerTasaCambio(sourceCurrency, 'EUR');
+        if (!Number.isFinite(tasa) || tasa <= 0) tasa = 1;
+    } catch (_) {}
+
+    for (const candidate of candidates) {
+        try {
+            const result = await yahooFinance.historical(candidate, {
+                period1, period2, interval: '1d', events: 'dividends'
+            });
+            if (!Array.isArray(result) || result.length === 0) continue;
+
+            const events = result
+                .filter(item => item.dividends != null && item.dividends > 0)
+                .map(item => {
+                    const dateStr = item.date instanceof Date
+                        ? item.date.toISOString().slice(0, 10)
+                        : new Date(item.date).toISOString().slice(0, 10);
+                    const rawAmount = normalizeMonetaryAmountByCurrency(item.dividends, sourceCurrency);
+                    return {
+                        date: dateStr,
+                        dividendPerShare: parseFloat(((rawAmount || item.dividends) * tasa).toFixed(6))
+                    };
+                });
+
+            if (events.length > 0) return { events, resolvedTicker: candidate };
+        } catch (_) {}
+    }
+    return { events: [], resolvedTicker: normalizedTicker };
+}
+
+module.exports = { getAssetPrice, obtenerTasaCambio, getHistoricalData, getDividendEvents };

@@ -52,7 +52,8 @@ const huchaService = new HuchaService();
 const gastosRealesService = new PuntualService('gastos_reales');
 const ingresosRealesService = new PuntualService('ingresos_reales');
 
-let currentUser = readLastUser();
+let currentUser = null;
+try { currentUser = readLastUser(); } catch (_) {}
 
 function getActiveUser() {
     return currentUser || readLastUser();
@@ -72,6 +73,29 @@ function getUploadsDir() {
     return paths.uploadsDir;
 }
 
+function validateImportItem(item) {
+    if (item.monto !== undefined && item.monto !== null) {
+        const monto = parseFloat(item.monto);
+        if (isNaN(monto) || monto <= 0) throw new Error(`monto inválido: ${item.monto}`);
+    }
+    if (item.fecha !== undefined && item.fecha !== null) {
+        const s = String(item.fecha);
+        if (!/^\d{4}-\d{2}(-\d{2})?$/.test(s)) throw new Error(`fecha inválida: ${item.fecha}`);
+        const parts = s.split('-');
+        const month = Number(parts[1]);
+        if (month < 1 || month > 12) throw new Error(`mes fuera de rango: ${item.fecha}`);
+        if (parts[2]) {
+            const day = Number(parts[2]);
+            if (day < 1 || day > 31) throw new Error(`día fuera de rango: ${item.fecha}`);
+        }
+    }
+    if (item.descripcion !== undefined && item.descripcion !== null) {
+        if (String(item.descripcion).length > 500) {
+            throw new Error('descripcion excede 500 caracteres');
+        }
+    }
+}
+
 async function importBatchWithTransaction(service, datos) {
     if (!Array.isArray(datos) || datos.length === 0) {
         throw new Error('No hay datos para importar');
@@ -85,6 +109,7 @@ async function importBatchWithTransaction(service, datos) {
     try {
         for (const item of datos) {
             try {
+                validateImportItem(item);
                 await service.add(item);
                 resultados.push({ ...item, ok: true });
                 exitosos += 1;
@@ -125,6 +150,19 @@ async function importBatchWithTransaction(service, datos) {
  * Registrar todos los handlers IPC
  */
 function registerIpcHandlers() {
+    // Central error logging wrapper for all IPC handlers.
+    // Electrons catches handler rejections and forwards them to the renderer,
+    // but this ensures every error is logged with the channel name for easier debugging.
+    const _origHandle = ipcMain.handle.bind(ipcMain);
+    const safeHandle = (channel, fn) => _origHandle(channel, async (...args) => {
+        try {
+            return await fn(...args);
+        } catch (err) {
+            console.error(`❌ IPC [${channel}]:`, err.message ?? err);
+            throw err;
+        }
+    });
+
         // Limpiar caché de dashboardService al iniciar la app
         try {
             const dashboardService = require('../services/dashboardService');
@@ -137,14 +175,14 @@ function registerIpcHandlers() {
     // ============= USUARIOS =============
 
     // ============= WINDOW CONTROLS =============
-    ipcMain.handle('window-minimize', async (event) => {
+    safeHandle('window-minimize', async (event) => {
         const win = BrowserWindow.fromWebContents(event.sender);
         if (!win) return { success: false };
         win.minimize();
         return { success: true };
     });
 
-    ipcMain.handle('window-maximize-toggle', async (event) => {
+    safeHandle('window-maximize-toggle', async (event) => {
         const win = BrowserWindow.fromWebContents(event.sender);
         if (!win) return { success: false, isMaximized: false };
 
@@ -157,33 +195,33 @@ function registerIpcHandlers() {
         return { success: true, isMaximized: win.isMaximized() };
     });
 
-    ipcMain.handle('window-close', async (event) => {
+    safeHandle('window-close', async (event) => {
         const win = BrowserWindow.fromWebContents(event.sender);
         if (!win) return { success: false };
         win.close();
         return { success: true };
     });
 
-    ipcMain.handle('window-is-maximized', async (event) => {
+    safeHandle('window-is-maximized', async (event) => {
         const win = BrowserWindow.fromWebContents(event.sender);
         return { isMaximized: !!win && win.isMaximized() };
     });
 
-    ipcMain.handle('list-users', async () => {
+    safeHandle('list-users', async () => {
         return { users: listUsers(), currentUser: getActiveUser() || null };
     });
 
-    ipcMain.handle('create-user', async (event, data) => {
+    safeHandle('create-user', async (event, data) => {
         const name = normalizeUserName(data?.name);
         ensureUserFolders(name);
         return { success: true, name };
     });
 
-    ipcMain.handle('get-current-user', async () => {
+    safeHandle('get-current-user', async () => {
         return { name: getActiveUser() || null };
     });
 
-    ipcMain.handle('set-current-user', async (event, data) => {
+    safeHandle('set-current-user', async (event, data) => {
         const name = normalizeUserName(data?.name);
         const paths = ensureUserFolders(name);
         await db.__setDbPath(paths.dbPath);
@@ -192,12 +230,12 @@ function registerIpcHandlers() {
         return { success: true, name, paths };
     });
 
-    ipcMain.handle('get-user-profile', async (event, data) => {
+    safeHandle('get-user-profile', async (event, data) => {
         const name = normalizeUserName(data?.name);
         return { profile: readUserProfile(name) };
     });
 
-    ipcMain.handle('set-user-icon', async (event, data) => {
+    safeHandle('set-user-icon', async (event, data) => {
         const name = normalizeUserName(data?.name);
         const icon = typeof data?.icon === 'string' ? data.icon.trim() : '';
         if (!icon) {
@@ -210,7 +248,7 @@ function registerIpcHandlers() {
 
     // ============= CATEGORIAS =============
     
-    ipcMain.handle('add-categoria', async (event, data) => {
+    safeHandle('add-categoria', async (event, data) => {
         const { nombre, tipo } = data;
         
         if (!nombre || !tipo) {
@@ -232,7 +270,7 @@ function registerIpcHandlers() {
         }
     });
 
-    ipcMain.handle('get-categorias', async () => {
+    safeHandle('get-categorias', async () => {
         const gastos = await dbAll(db, "SELECT * FROM categorias WHERE tipo='gasto' ORDER BY nombre");
         const ingresos = await dbAll(db, "SELECT * FROM categorias WHERE tipo='ingreso' ORDER BY nombre");
         const impuestos = await dbAll(db, "SELECT * FROM categorias WHERE tipo='impuestos' ORDER BY nombre");
@@ -243,7 +281,7 @@ function registerIpcHandlers() {
         };
     });
 
-    ipcMain.handle('update-categoria', async (event, data) => {
+    safeHandle('update-categoria', async (event, data) => {
         const { id, nombre } = data;
         if (!id || !nombre) {
             throw new Error('ID y nombre son requeridos');
@@ -252,7 +290,7 @@ function registerIpcHandlers() {
         return { success: true, message: 'Categoría actualizada' };
     });
 
-    ipcMain.handle('delete-categoria', async (event, data) => {
+    safeHandle('delete-categoria', async (event, data) => {
         const { id } = data;
         if (!id) {
             throw new Error('ID es requerido');
@@ -263,223 +301,223 @@ function registerIpcHandlers() {
 
     // ============= GASTOS =============
     
-    ipcMain.handle('add-gasto-puntual', async (event, data) => {
+    safeHandle('add-gasto-puntual', async (event, data) => {
         await gastosPuntualesService.add(data);
         return { success: true };
     });
 
-    ipcMain.handle('delete-gasto-puntual', async (event, data) => {
+    safeHandle('delete-gasto-puntual', async (event, data) => {
         await gastosPuntualesService.delete(data.id);
         return { success: true };
     });
 
-    ipcMain.handle('update-gasto-puntual', async (event, data) => {
+    safeHandle('update-gasto-puntual', async (event, data) => {
         await gastosPuntualesService.update(data);
         return { success: true };
     });
 
-    ipcMain.handle('add-gasto-mensual', async (event, data) => {
+    safeHandle('add-gasto-mensual', async (event, data) => {
         await gastosMensualesService.add(data);
         return { success: true };
     });
 
-    ipcMain.handle('delete-gasto-mensual', async (event, data) => {
+    safeHandle('delete-gasto-mensual', async (event, data) => {
         await gastosMensualesService.delete(data.id);
         return { success: true };
     });
 
-    ipcMain.handle('update-gasto-mensual', async (event, data) => {
+    safeHandle('update-gasto-mensual', async (event, data) => {
         await gastosMensualesService.update(data);
         return { success: true };
     });
 
     // ============= INGRESOS =============
     
-    ipcMain.handle('add-ingreso-puntual', async (event, data) => {
+    safeHandle('add-ingreso-puntual', async (event, data) => {
         await ingresosPuntualesService.add(data);
         return { success: true };
     });
 
-    ipcMain.handle('delete-ingreso-puntual', async (event, data) => {
+    safeHandle('delete-ingreso-puntual', async (event, data) => {
         await ingresosPuntualesService.delete(data.id);
         return { success: true };
     });
 
-    ipcMain.handle('update-ingreso-puntual', async (event, data) => {
+    safeHandle('update-ingreso-puntual', async (event, data) => {
         await ingresosPuntualesService.update(data);
         return { success: true };
     });
 
-    ipcMain.handle('add-ingreso-mensual', async (event, data) => {
+    safeHandle('add-ingreso-mensual', async (event, data) => {
         await ingresosMensualesService.add(data);
         return { success: true };
     });
 
-    ipcMain.handle('delete-ingreso-mensual', async (event, data) => {
+    safeHandle('delete-ingreso-mensual', async (event, data) => {
         await ingresosMensualesService.delete(data.id);
         return { success: true };
     });
 
-    ipcMain.handle('update-ingreso-mensual', async (event, data) => {
+    safeHandle('update-ingreso-mensual', async (event, data) => {
         await ingresosMensualesService.update(data);
         return { success: true };
     });
 
     // ============= GASTOS REALES =============
 
-    ipcMain.handle('add-gasto-real', async (event, data) => {
+    safeHandle('add-gasto-real', async (event, data) => {
         await gastosRealesService.add(data);
         return { success: true };
     });
 
-    ipcMain.handle('delete-gasto-real', async (event, data) => {
+    safeHandle('delete-gasto-real', async (event, data) => {
         await gastosRealesService.delete(data.id);
         return { success: true };
     });
 
-    ipcMain.handle('update-gasto-real', async (event, data) => {
+    safeHandle('update-gasto-real', async (event, data) => {
         await gastosRealesService.update(data);
         return { success: true };
     });
 
     // ============= INGRESOS REALES =============
 
-    ipcMain.handle('add-ingreso-real', async (event, data) => {
+    safeHandle('add-ingreso-real', async (event, data) => {
         await ingresosRealesService.add(data);
         return { success: true };
     });
 
-    ipcMain.handle('delete-ingreso-real', async (event, data) => {
+    safeHandle('delete-ingreso-real', async (event, data) => {
         await ingresosRealesService.delete(data.id);
         return { success: true };
     });
 
-    ipcMain.handle('update-ingreso-real', async (event, data) => {
+    safeHandle('update-ingreso-real', async (event, data) => {
         await ingresosRealesService.update(data);
         return { success: true };
     });
 
     // ============= IMPORT BANCO =============
     
-    ipcMain.handle('import-gastos-puntuales', async (event, data) => {
+    safeHandle('import-gastos-puntuales', async (event, data) => {
         return importBatchWithTransaction(gastosPuntualesService, data?.datos);
     });
 
-    ipcMain.handle('import-ingresos-puntuales', async (event, data) => {
+    safeHandle('import-ingresos-puntuales', async (event, data) => {
         return importBatchWithTransaction(ingresosPuntualesService, data?.datos);
     });
 
     // ============= IMPORT REAL (BANCO) =============
 
-    ipcMain.handle('import-gastos-reales', async (event, data) => {
+    safeHandle('import-gastos-reales', async (event, data) => {
         return importBatchWithTransaction(gastosRealesService, data?.datos);
     });
 
-    ipcMain.handle('import-ingresos-reales', async (event, data) => {
+    safeHandle('import-ingresos-reales', async (event, data) => {
         return importBatchWithTransaction(ingresosRealesService, data?.datos);
     });
 
     // ============= IMPUESTOS =============
     
-    ipcMain.handle('add-impuesto-puntual', async (event, data) => {
+    safeHandle('add-impuesto-puntual', async (event, data) => {
         await impuestosPuntualesService.add(data);
         return { success: true };
     });
 
-    ipcMain.handle('delete-impuesto-puntual', async (event, data) => {
+    safeHandle('delete-impuesto-puntual', async (event, data) => {
         await impuestosPuntualesService.delete(data.id);
         return { success: true };
     });
 
-    ipcMain.handle('update-impuesto-puntual', async (event, data) => {
+    safeHandle('update-impuesto-puntual', async (event, data) => {
         await impuestosPuntualesService.update(data);
         return { success: true };
     });
 
-    ipcMain.handle('add-impuesto-mensual', async (event, data) => {
+    safeHandle('add-impuesto-mensual', async (event, data) => {
         await impuestosMensualesService.add(data);
         return { success: true };
     });
 
-    ipcMain.handle('delete-impuesto-mensual', async (event, data) => {
+    safeHandle('delete-impuesto-mensual', async (event, data) => {
         await impuestosMensualesService.delete(data.id);
         return { success: true };
     });
 
-    ipcMain.handle('update-impuesto-mensual', async (event, data) => {
+    safeHandle('update-impuesto-mensual', async (event, data) => {
         await impuestosMensualesService.update(data);
         return { success: true };
     });
 
     // ============= HUCHA =============
     
-    ipcMain.handle('get-hucha', async () => {
+    safeHandle('get-hucha', async () => {
         return await huchaService.getAll();
     });
 
-    ipcMain.handle('add-hucha', async (event, data) => {
+    safeHandle('add-hucha', async (event, data) => {
         await huchaService.add(data);
         return { success: true };
     });
 
-    ipcMain.handle('update-hucha', async (event, data) => {
+    safeHandle('update-hucha', async (event, data) => {
         await huchaService.update(data);
         return { success: true };
     });
 
-    ipcMain.handle('delete-hucha', async (event, data) => {
+    safeHandle('delete-hucha', async (event, data) => {
         await huchaService.delete(data.id);
         return { success: true };
     });
 
     // ============= SUB-HUCHAS =============
 
-    ipcMain.handle('get-sub-huchas', async () => {
+    safeHandle('get-sub-huchas', async () => {
         return await subHuchaService.getAll();
     });
 
-    ipcMain.handle('add-sub-hucha', async (event, data) => {
+    safeHandle('add-sub-hucha', async (event, data) => {
         await subHuchaService.add(data);
         return { success: true };
     });
 
-    ipcMain.handle('update-sub-hucha', async (event, data) => {
+    safeHandle('update-sub-hucha', async (event, data) => {
         await subHuchaService.update(data);
         return { success: true };
     });
 
-    ipcMain.handle('delete-sub-hucha', async (event, data) => {
+    safeHandle('delete-sub-hucha', async (event, data) => {
         await subHuchaService.delete(data.id);
         return { success: true };
     });
 
-    ipcMain.handle('get-sub-hucha-puntuales', async (event, id) => {
+    safeHandle('get-sub-hucha-puntuales', async (event, id) => {
         return await subHuchaService.getPuntuales(id);
     });
 
-    ipcMain.handle('add-sub-hucha-puntual', async (event, data) => {
+    safeHandle('add-sub-hucha-puntual', async (event, data) => {
         await subHuchaService.addPuntual(data);
         return { success: true };
     });
 
-    ipcMain.handle('delete-sub-hucha-puntual', async (event, data) => {
+    safeHandle('delete-sub-hucha-puntual', async (event, data) => {
         await subHuchaService.deletePuntual(data.id);
         return { success: true };
     });
 
-    ipcMain.handle('get-sub-huchas-total', async (event, mes) => {
+    safeHandle('get-sub-huchas-total', async (event, mes) => {
         const total = await subHuchaService.calcularTotalSubHuchas(mes);
         return { total };
     });
 
     // ============= CUENTA REMUNERADA =============
     
-    ipcMain.handle('get-cuenta-remunerada', async () => {
+    safeHandle('get-cuenta-remunerada', async () => {
         const rows = await dbAll(db, "SELECT * FROM cuenta_remunerada ORDER BY created_at DESC");
         return rows || [];
     });
 
-    ipcMain.handle('add-cuenta-remunerada', async (event, data) => {
+    safeHandle('add-cuenta-remunerada', async (event, data) => {
         const { descripcion, monto, aportacion_mensual, interes, retencion, categoria_id, desde, hasta } = data;
         if (monto === undefined || categoria_id === undefined || !desde || !hasta) {
             throw new Error('Monto, categoría, desde y hasta son requeridos');
@@ -495,7 +533,7 @@ function registerIpcHandlers() {
         return { success: true };
     });
 
-    ipcMain.handle('update-cuenta-remunerada', async (event, data) => {
+    safeHandle('update-cuenta-remunerada', async (event, data) => {
         const { id, desde, hasta, monto, aportacion_mensual, interes, retencion, categoria_id, categoria, descripcion } = data;
         if (!id) {
             throw new Error('ID es requerido');
@@ -530,7 +568,7 @@ function registerIpcHandlers() {
         return { success: true };
     });
 
-    ipcMain.handle('delete-cuenta-remunerada', async (event, data) => {
+    safeHandle('delete-cuenta-remunerada', async (event, data) => {
         const { id } = data;
         if (!id) {
             throw new Error('ID es requerido');
@@ -541,7 +579,7 @@ function registerIpcHandlers() {
 
     // ============= ASSETS (Yahoo Finance) =============
     
-    ipcMain.handle('get-assets', async () => {
+    safeHandle('get-assets', async () => {
         const rows = await dbAll(db, `
             SELECT a.*, c.nombre as categoria
             FROM assets a
@@ -551,7 +589,7 @@ function registerIpcHandlers() {
         return rows || [];
     });
 
-    ipcMain.handle('add-asset', async (event, data) => {
+    safeHandle('add-asset', async (event, data) => {
         const { company, ticker, shares, purchase_price } = data;
         if (!company || !ticker || !shares || !purchase_price) {
             throw new Error('Todos los campos son requeridos');
@@ -571,7 +609,7 @@ function registerIpcHandlers() {
         return { success: true };
     });
 
-    ipcMain.handle('update-asset', async (event, data) => {
+    safeHandle('update-asset', async (event, data) => {
         const { id, company, ticker, shares, purchase_price } = data;
         if (!id) {
             throw new Error('ID es requerido');
@@ -591,7 +629,7 @@ function registerIpcHandlers() {
         return { success: true };
     });
 
-    ipcMain.handle('delete-asset', async (event, data) => {
+    safeHandle('delete-asset', async (event, data) => {
         const { id } = data;
         if (!id) {
             throw new Error('ID es requerido');
@@ -600,7 +638,7 @@ function registerIpcHandlers() {
         return { success: true };
     });
 
-    ipcMain.handle('sell-asset', async (event, data) => {
+    safeHandle('sell-asset', async (event, data) => {
         const { id, sale_price } = data;
         if (!id || !sale_price) {
             throw new Error('ID y precio de venta son requeridos');
@@ -639,7 +677,7 @@ function registerIpcHandlers() {
         return { success: true, profit };
     });
 
-    ipcMain.handle('get-asset-price', async (event, ticker) => {
+    safeHandle('get-asset-price', async (event, ticker) => {
         const safeTicker = String(ticker || '').trim().toUpperCase();
         if (!safeTicker) {
             return { ticker: safeTicker, currentPrice: null, currency: 'EUR', unavailable: true };
@@ -653,7 +691,7 @@ function registerIpcHandlers() {
         }
     });
 
-    ipcMain.handle('get-asset-history', async (event, ticker, period) => {
+    safeHandle('get-asset-history', async (event, ticker, period) => {
         const safeTicker = String(ticker || '').trim().toUpperCase();
         const safePeriod = String(period || '1y').trim() || '1y';
         try {
@@ -673,57 +711,57 @@ function registerIpcHandlers() {
 
     // ============= DASHBOARD =============
     
-    ipcMain.handle('get-dashboard-data', async () => {
+    safeHandle('get-dashboard-data', async () => {
         return await getDashboardData();
     });
 
-    ipcMain.handle('get-dashboard-real-data', async () => {
+    safeHandle('get-dashboard-real-data', async () => {
         return await getDashboardRealData();
     });
 
-    ipcMain.handle('get-dashboard-rango-fechas', async () => {
+    safeHandle('get-dashboard-rango-fechas', async () => {
         return await getDashboardRangoFechas();
     });
 
-    ipcMain.handle('get-impuestos-mes', async (event, params) => {
+    safeHandle('get-impuestos-mes', async (event, params) => {
         return await getImpuestosMes(params.desde, params.hasta);
     });
 
-    ipcMain.handle('get-impuestos-mes-real', async (event, params) => {
+    safeHandle('get-impuestos-mes-real', async (event, params) => {
         return await getImpuestosMesReal(params.desde, params.hasta);
     });
 
-    ipcMain.handle('get-ahorros-mes', async (event, params) => {
+    safeHandle('get-ahorros-mes', async (event, params) => {
         return await getAhorrosMes(params.desde, params.hasta, params.categoria_id);
     });
 
-    ipcMain.handle('get-ahorros-mes-real', async (event, params) => {
+    safeHandle('get-ahorros-mes-real', async (event, params) => {
         return await getAhorrosMesReal(params.desde, params.hasta, params.categoria_id);
     });
 
-    ipcMain.handle('get-categorias-periodo', async (event, params) => {
+    safeHandle('get-categorias-periodo', async (event, params) => {
         return await getCategoriasPeriodo(params.desde, params.hasta);
     });
 
-    ipcMain.handle('get-categorias-periodo-real', async (event, params) => {
+    safeHandle('get-categorias-periodo-real', async (event, params) => {
         return await getCategoriasPeriodoReal(params.desde, params.hasta);
     });
 
-    ipcMain.handle('get-gastos-categoria-mes', async (event, params) => {
+    safeHandle('get-gastos-categoria-mes', async (event, params) => {
         return await getGastosCategoriaMes(params.desde, params.hasta);
     });
 
-    ipcMain.handle('get-gastos-categoria-mes-real', async (event, params) => {
+    safeHandle('get-gastos-categoria-mes-real', async (event, params) => {
         return await getGastosCategoriaMesReal(params.desde, params.hasta);
     });
 
-    ipcMain.handle('get-resumen-periodos', async () => {
+    safeHandle('get-resumen-periodos', async () => {
         return await getResumenPeriodos();
     });
 
     // ============= IMPORTACION BANCARIA =============
     
-    ipcMain.handle('import-list', async () => {
+    safeHandle('import-list', async () => {
         try {
             const uploadsDir = getUploadsDir();
             
@@ -771,7 +809,7 @@ function registerIpcHandlers() {
         }
     });
 
-    ipcMain.handle('import-content', async (event, id) => {
+    safeHandle('import-content', async (event, id) => {
         console.log('📖 import-content llamado con id:', id, 'tipo:', typeof id);
         
         // Asegurar que id es un string
@@ -798,7 +836,7 @@ function registerIpcHandlers() {
         return { success: true, nombre: nombreSinTimestamp, contenido };
     });
 
-    ipcMain.handle('import-delete', async (event, id) => {
+    safeHandle('import-delete', async (event, id) => {
         console.log('🗑️ import-delete llamado con id:', id, 'tipo:', typeof id);
         
         // Asegurar que id es un string
@@ -814,7 +852,7 @@ function registerIpcHandlers() {
         return { success: true };
     });
 
-    ipcMain.handle('import-save', async (event, data) => {
+    safeHandle('import-save', async (event, data) => {
         const { filename, contenido } = data;
         if (!filename || !contenido) {
             throw new Error('Filename y contenido son requeridos');
@@ -839,6 +877,87 @@ function registerIpcHandlers() {
         console.log(`💾 Archivo guardado físicamente: ${uniqueFilename}`);
         
         return { success: true, message: 'Archivo guardado correctamente', filename: uniqueFilename };
+    });
+
+    // ============= BOLSA / INVERSIONES =============
+
+    const BolsaService = require('../services/BolsaService');
+    const yahooFinanceService = require('../services/yahooFinanceService');
+    const bolsaService = new BolsaService();
+
+    // Ensure bolsa tables exist (runs pending migrations)
+    safeHandle('bolsa-ensure-setup', async () => {
+        await runMigrations();
+        return { success: true };
+    });
+
+    safeHandle('bolsa-get-operaciones', async () => {
+        return await bolsaService.getOperaciones();
+    });
+
+    safeHandle('bolsa-add-operacion', async (event, data) => {
+        await bolsaService.addOperacion(data);
+        // background: fetch ticker history if missing/stale
+        const ticker = String(data?.ticker || '').trim().toUpperCase();
+        if (ticker) {
+            bolsaService.getTickerLastDate(ticker).then(lastDate => {
+                const today = new Date().toISOString().slice(0, 10);
+                if (lastDate && lastDate >= today) return;
+                const period = lastDate ? '3mo' : '2y';
+                yahooFinanceService.getHistoricalData(ticker, period)
+                    .then(r => { if (r?.data?.length) bolsaService.cacheTickerHistory(ticker, r.data); })
+                    .catch(() => {});
+            }).catch(() => {});
+        }
+        return { success: true };
+    });
+
+    safeHandle('bolsa-update-operacion', async (event, data) => {
+        await bolsaService.updateOperacion(data);
+        return { success: true };
+    });
+
+    safeHandle('bolsa-delete-operacion', async (event, id) => {
+        await bolsaService.deleteOperacion(id);
+        return { success: true };
+    });
+
+    safeHandle('bolsa-get-dividendos', async () => {
+        return await bolsaService.getDividendos();
+    });
+
+    safeHandle('bolsa-get-posiciones', async () => {
+        return await bolsaService.getPosiciones();
+    });
+
+    safeHandle('bolsa-get-resumen', async () => {
+        return await bolsaService.getResumen();
+    });
+
+    safeHandle('bolsa-get-estadisticas', async () => {
+        return await bolsaService.getEstadisticasOperaciones();
+    });
+
+    safeHandle('bolsa-get-ticker-history', async (event, ticker) => {
+        const norm = String(ticker || '').trim().toUpperCase();
+        if (!norm) throw new Error('Ticker requerido');
+
+        const lastDate = await bolsaService.getTickerLastDate(norm);
+        const today = new Date().toISOString().slice(0, 10);
+        if (!lastDate || lastDate < today) {
+            try {
+                const period = lastDate ? '3mo' : '2y';
+                const result = await yahooFinanceService.getHistoricalData(norm, period);
+                if (result?.data?.length) await bolsaService.cacheTickerHistory(norm, result.data);
+            } catch (_) {}
+        }
+        const history = await bolsaService.getTickerHistoryFromDb(norm);
+        return { ticker: norm, data: history };
+    });
+
+    safeHandle('bolsa-sync-dividendos', async () => {
+        const result = await bolsaService.syncDividendosAuto(yahooFinanceService);
+        return { success: true, stats: result.stats, totalAdded: result.totalAdded, totalUpdated: result.totalUpdated };
     });
 
     console.log('✅ IPC Handlers registrados');
