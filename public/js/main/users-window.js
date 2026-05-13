@@ -1,6 +1,56 @@
 // ===== USUARIOS =====
 let activeUser = null;
 let switchingUser = false;
+
+// Shim REST para modo web (sin Electron)
+const webUserAPI = {
+    listUsers: async () => {
+        const r = await fetch('/users');
+        if (!r.ok) throw new Error('Error listando usuarios');
+        return r.json();
+    },
+    getCurrentUser: async () => {
+        const r = await fetch('/users/current');
+        if (!r.ok) throw new Error('Error obteniendo usuario actual');
+        return r.json();
+    },
+    createUser: async ({ name }) => {
+        const r = await fetch('/users/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name }),
+        });
+        if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'Error creando usuario'); }
+        return r.json();
+    },
+    setCurrentUser: async ({ name }) => {
+        const r = await fetch('/users/select', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name }),
+        });
+        if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'Error seleccionando usuario'); }
+        return r.json();
+    },
+    getUserProfile: async ({ name }) => {
+        const r = await fetch(`/users/profile?name=${encodeURIComponent(name)}`);
+        if (!r.ok) throw new Error('Error obteniendo perfil');
+        return r.json();
+    },
+    setUserIcon: async ({ name, icon }) => {
+        const r = await fetch('/users/icon', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, icon }),
+        });
+        if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'Error guardando icono'); }
+        return r.json();
+    },
+};
+
+function getUserAPI() {
+    return window.electronAPI || webUserAPI;
+}
 const DEFAULT_USER_ICON = 'fa-user';
 const USER_ICON_OPTIONS = [
     { value: 'fa-user', label: 'User' },
@@ -39,11 +89,13 @@ async function initWindowControls() {
     if (!titlebar || !minimizeBtn || !maximizeBtn || !closeBtn) return;
     if (!api || !api.windowMinimize || !api.windowMaximizeToggle || !api.windowClose) {
         titlebar.style.display = 'none';
+        document.body.classList.add('no-titlebar');
         return;
     }
 
     if (api.platform === 'darwin') {
         titlebar.style.display = 'none';
+        document.body.classList.add('no-titlebar');
         return;
     }
 
@@ -134,12 +186,12 @@ function fillUserIconSelect(select) {
 }
 
 async function loadUserIcon(name) {
-    if (!name || !window.electronAPI?.getUserProfile) {
+    if (!name) {
         updateUserIconUI(DEFAULT_USER_ICON);
         return DEFAULT_USER_ICON;
     }
     try {
-        const result = await window.electronAPI.getUserProfile({ name });
+        const result = await getUserAPI().getUserProfile({ name });
         const icon = result?.profile?.icon || DEFAULT_USER_ICON;
         const select = document.getElementById('userIconSelect');
         if (select) select.value = icon;
@@ -238,9 +290,9 @@ function resetUserScopedState() {
 
 async function refreshUserList() {
     const select = document.getElementById('userSelect');
-    if (!select || !window.electronAPI?.listUsers) return { users: [], currentUser: null };
+    if (!select) return { users: [], currentUser: null };
 
-    const result = await window.electronAPI.listUsers();
+    const result = await getUserAPI().listUsers();
     const users = result?.users || [];
     const currentUser = result?.currentUser || null;
 
@@ -256,7 +308,7 @@ async function refreshUserList() {
 }
 
 async function applyUserSelection(name, { auto = false } = {}) {
-    if (!name || !window.electronAPI?.setCurrentUser) return;
+    if (!name) return;
     if (name === activeUser) {
         if (!auto) toggleUserOverlay(false);
         return;
@@ -264,7 +316,7 @@ async function applyUserSelection(name, { auto = false } = {}) {
 
     try {
         switchingUser = true;
-        await window.electronAPI.setCurrentUser({ name });
+        await getUserAPI().setCurrentUser({ name });
         activeUser = name;
         localStorage.setItem('currentUser', name);
         setUserLabel(name);
@@ -284,10 +336,6 @@ async function applyUserSelection(name, { auto = false } = {}) {
 }
 
 async function initUserSelection() {
-    if (!window.electronAPI?.listUsers) {
-        loadTab('inicio');
-        return;
-    }
 
     const changeBtn = document.getElementById('changeUserBtn');
     const selectBtn = document.getElementById('userSelectBtn');
@@ -322,12 +370,12 @@ async function initUserSelection() {
         iconSelect.addEventListener('change', async () => {
             const icon = iconSelect.value || DEFAULT_USER_ICON;
             const targetUser = select?.value || activeUser;
-            if (!targetUser || !window.electronAPI?.setUserIcon) {
+            if (!targetUser) {
                 updateUserIconUI(icon);
                 return;
             }
             try {
-                await window.electronAPI.setUserIcon({ name: targetUser, icon });
+                await getUserAPI().setUserIcon({ name: targetUser, icon });
                 updateUserIconUI(icon);
             } catch (err) {
                 showUserError(err.message || 'No se pudo guardar el icono');
@@ -349,11 +397,9 @@ async function initUserSelection() {
             if (!name) return;
 
             try {
-                await window.electronAPI.createUser({ name });
+                await getUserAPI().createUser({ name });
                 const icon = iconSelect?.value || DEFAULT_USER_ICON;
-                if (window.electronAPI?.setUserIcon) {
-                    await window.electronAPI.setUserIcon({ name, icon });
-                }
+                await getUserAPI().setUserIcon({ name, icon });
                 newUserInput.value = '';
                 await refreshUserList();
                 await applyUserSelection(name);

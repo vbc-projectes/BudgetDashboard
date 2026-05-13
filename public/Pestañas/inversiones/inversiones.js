@@ -361,11 +361,12 @@ async function _renderEvolutionChart(period) {
             investedByDate[date] = cumulInvested;
         }
 
-        // Build rendimiento histórico (%) = (portfolioValue − netInvested) / |netInvested| × 100
-        // Series shows return relative to what was put in at that moment — independent of absolute size
-        const values = sortedDates.map(date => {
+        // Build P&L series: absolute € (seriesEur) and % of net invested (seriesPct)
+        const seriesEur = [];
+        const seriesPct = [];
+        for (const date of sortedDates) {
             const invested = investedByDate[date];
-            if (!invested || invested <= 0) return null;
+            if (!invested || invested <= 0) { seriesEur.push(null); seriesPct.push(null); continue; }
             let portfolioVal = 0;
             let found = false;
             for (const pos of _inv.posiciones) {
@@ -374,53 +375,58 @@ async function _renderEvolutionChart(period) {
                 const p = getPriceFill(pos.ticker, date);
                 if (p != null) { portfolioVal += p * shares; found = true; }
             }
-            if (!found) return null;
-            return parseFloat(((portfolioVal - invested) / invested * 100).toFixed(4));
-        });
+            if (!found) { seriesEur.push(null); seriesPct.push(null); continue; }
+            const pnl = portfolioVal - invested;
+            seriesEur.push(parseFloat(pnl.toFixed(2)));
+            seriesPct.push(parseFloat((pnl / invested * 100).toFixed(4)));
+        }
 
         // Trim leading nulls
-        const firstValid = values.findIndex(v => v !== null);
+        const firstValid = seriesEur.findIndex(v => v !== null);
         if (firstValid < 0) throw new Error('no-data');
-        const labels = sortedDates.slice(firstValid);
-        const data   = values.slice(firstValid);
+        const labels  = sortedDates.slice(firstValid);
+        const dataEur = seriesEur.slice(firstValid);
+        const dataPct = seriesPct.slice(firstValid);
 
         if (_inv.chartEvol) { try { _inv.chartEvol.destroy(); } catch (_) {} _inv.chartEvol = null; }
         if (loadEl) loadEl.style.display = 'none';
         canvas.style.display = 'block';
 
-        // Period label: cambio en el retorno normalizado durante la ventana seleccionada.
-        // data[i] ya es (cartera - coste_neto) / coste_neto × 100, así que la diferencia
-        // entre inicio y fin de la ventana es la variación en pp — independiente del capital total.
-        const firstPct = data.find(v => v !== null) ?? null;
-        const lastPct  = [...data].reverse().find(v => v !== null) ?? null;
-        const periodReturn = (firstPct !== null && lastPct !== null) ? lastPct - firstPct : null;
+        // Period label: P&L € y % acumulados al final de la ventana seleccionada
+        const lastEur = [...dataEur].reverse().find(v => v !== null) ?? null;
+        const lastPct = [...dataPct].reverse().find(v => v !== null) ?? null;
         if (labelEl) {
-            if (periodReturn !== null) {
-                labelEl.textContent = (periodReturn >= 0 ? '+' : '') + periodReturn.toFixed(2) + ' pp';
-                labelEl.style.color = periodReturn >= 0 ? 'var(--color-ingreso,#22c55e)' : 'var(--color-gasto,#ef4444)';
+            if (lastEur !== null && lastPct !== null) {
+                labelEl.textContent = (lastEur >= 0 ? '+' : '') + _fmt(lastEur) + '  /  ' + _fmtPct(lastPct);
+                labelEl.style.color = lastEur >= 0 ? 'var(--color-ingreso,#22c55e)' : 'var(--color-gasto,#ef4444)';
             } else {
                 labelEl.textContent = '—';
                 labelEl.style.color = '';
             }
         }
 
-        const lastVal   = [...data].reverse().find(v => v !== null) ?? 0;
-        const lineColor = lastVal >= 0 ? '#22c55e' : '#ef4444';
+        const lineColor = (lastEur ?? 0) >= 0 ? '#22c55e' : '#ef4444';
         _inv.chartEvol = new Chart(canvas, {
             type: 'line',
             data: {
                 labels,
                 datasets: [{
-                    label: 'Rendimiento sobre coste (%)', data,
-                    borderColor: lineColor, backgroundColor: lineColor + '20',
+                    label: 'P&L €', data: dataEur,
+                    borderColor: lineColor, backgroundColor: lineColor + '28',
                     borderWidth: 2, fill: true, tension: 0.1,
                     pointRadius: 0, pointHoverRadius: 5,
-                    spanGaps: true
+                    spanGaps: true, yAxisID: 'y'
+                }, {
+                    label: 'P&L %', data: dataPct,
+                    borderColor: lineColor + 'aa', backgroundColor: 'transparent',
+                    borderWidth: 1.5, fill: false, tension: 0.1,
+                    pointRadius: 0, pointHoverRadius: 5,
+                    spanGaps: true, borderDash: [5, 3], yAxisID: 'y1'
                 }, {
                     // Zero line reference
                     label: '_zero', data: labels.map(() => 0),
                     borderColor: 'rgba(0,0,0,0.15)', backgroundColor: 'transparent',
-                    borderWidth: 1, borderDash: [4, 4], pointRadius: 0, fill: false
+                    borderWidth: 1, borderDash: [4, 4], pointRadius: 0, fill: false, yAxisID: 'y'
                 }]
             },
             options: {
@@ -429,17 +435,30 @@ async function _renderEvolutionChart(period) {
                     legend: { display: false },
                     tooltip: {
                         mode: 'index', intersect: false,
-                        filter: item => item.datasetIndex === 0,
+                        filter: item => item.datasetIndex <= 1,
                         callbacks: {
-                            label: ctx => ` ${ctx.parsed.y >= 0 ? '+' : ''}${ctx.parsed.y.toFixed(2)} %`
+                            label: ctx => {
+                                if (ctx.datasetIndex === 0) {
+                                    const v = ctx.parsed.y;
+                                    return ` P&L: ${v >= 0 ? '+' : ''}${_fmt(v)}`;
+                                }
+                                const v = ctx.parsed.y;
+                                return ` ${v >= 0 ? '+' : ''}${v.toFixed(2)} %`;
+                            }
                         }
                     }
                 },
                 scales: {
                     x: { ticks: { color: '#333', maxTicksLimit: 10, maxRotation: 45 }, grid: { color: 'rgba(0,0,0,0.07)' } },
                     y: {
-                        ticks: { color: '#333', callback: v => (v >= 0 ? '+' : '') + v.toFixed(1) + ' %' },
+                        position: 'left',
+                        ticks: { color: '#333', callback: v => _fmt(v, 0) },
                         grid: { color: 'rgba(0,0,0,0.07)' }
+                    },
+                    y1: {
+                        position: 'right',
+                        ticks: { color: '#333', callback: v => (v >= 0 ? '+' : '') + v.toFixed(1) + ' %' },
+                        grid: { drawOnChartArea: false }
                     }
                 },
                 interaction: { mode: 'nearest', axis: 'x', intersect: false }

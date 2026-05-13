@@ -210,6 +210,11 @@
     overflow-y: auto;
 }
 
+.no-titlebar .app-body {
+    margin-top: 0;
+    min-height: 100vh;
+}
+
 .window-titlebar {
     position: fixed;
     top: 0;
