@@ -98,6 +98,26 @@ function initKeyboardNavigation() {
     });
 }
 
+// ── Tab transition progress bar helper ─────────────────────────────
+const _bar = {
+    el: null,
+    get() { return this.el || (this.el = document.getElementById('tab-progress-bar-inner')); },
+    start() {
+        const b = this.get(); if (!b) return;
+        b.className = '';
+        void b.offsetWidth; // force reflow to restart transition
+        b.className = 'bar-start';
+    },
+    done() {
+        const b = this.get(); if (!b) return;
+        b.className = 'bar-done';
+        setTimeout(() => {
+            b.className = 'bar-fade';
+            setTimeout(() => { b.className = ''; }, 400);
+        }, 160);
+    }
+};
+
 async function loadTab(tabId) {
     try {
         const currentTab = document.querySelector('.tablink.active');
@@ -116,11 +136,10 @@ async function loadTab(tabId) {
 
         setActiveTabButton(tabId);
         
-        // Agregar clase de carga para transición suave
-        tabContent.style.opacity = '0';
-        
-        // Esperar a que termine la transición de fade out
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Fade-out con clase CSS + arrancar barra de progreso
+        _bar.start();
+        tabContent.classList.add('tab-leaving');
+        await new Promise(resolve => setTimeout(resolve, 220));
         
         const nextTabPath = TAB_TEMPLATE_PATHS[tabId] || `Pestañas/${tabId}/${tabId}.html`;
         let res = await fetch(nextTabPath);
@@ -183,15 +202,19 @@ async function loadTab(tabId) {
         // Añadir filtros por columna a las tablas de la pestaña.
         initTableSearchers(tabContent);
         
-        // Restaurar scroll y mostrar con transición después de que el layout esté completo
-        requestAnimationFrame(() => {
+        // Restaurar scroll y mostrar con animación de entrada
+        tabContent.classList.remove('tab-leaving');
+        requestAnimationFrame(() => requestAnimationFrame(() => {
             window.scrollTo({ top: savedPosition, behavior: 'instant' });
-            tabContent.style.opacity = '1';
-        });
+            tabContent.classList.add('tab-entering');
+            _bar.done();
+            setTimeout(() => tabContent.classList.remove('tab-entering'), 300);
+        }));
 
     } catch (error) {
         console.error(`❌ Error cargando pestaña ${tabId}:`, error);
-        tabContent.style.opacity = '1';
+        tabContent.classList.remove('tab-leaving', 'tab-entering');
+        _bar.done();
     }
 }
 

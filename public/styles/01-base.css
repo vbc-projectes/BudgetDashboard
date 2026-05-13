@@ -566,7 +566,23 @@ main {
 
 #tab-content {
     opacity: 1;
-    transition: opacity 0.3s ease-in-out;
+    transform: translateY(0);
+    transition: opacity 0.22s cubic-bezier(0.4, 0, 1, 1), transform 0.22s cubic-bezier(0.4, 0, 1, 1);
+    will-change: opacity, transform;
+}
+
+#tab-content.tab-leaving {
+    opacity: 0;
+    transform: translateY(-6px);
+}
+
+#tab-content.tab-entering {
+    animation: tabContentIn 0.26s cubic-bezier(0.0, 0.0, 0.2, 1) both;
+}
+
+@keyframes tabContentIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0);    }
 }
 
 .tab {

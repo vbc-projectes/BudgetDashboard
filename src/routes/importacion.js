@@ -130,7 +130,7 @@ router.get('/api/importacion/contenido/:id', (req, res, next) => {
 });
 
 // Delete saved file
-router.post('/api/importacion/eliminar/:id', (req, res, next) => {
+router.delete('/api/importacion/eliminar/:id', (req, res, next) => {
     try {
         const idStr = path.basename(req.params.id);
         const rutaArchivo = path.join(getUploadsDir(), idStr);
