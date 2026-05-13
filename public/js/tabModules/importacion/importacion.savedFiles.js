@@ -4,8 +4,13 @@
     async function cargarListadoArchivos(ctx) {
         const { showAlert, t, escapeHtml, crearElementoArchivo } = ctx;
         try {
-            const response = await fetch('/api/importacion/listar');
-            const data = await response.json();
+            let data;
+            if (window.electronAPI?.importList) {
+                data = await window.electronAPI.importList();
+            } else {
+                const response = await fetch('/api/importacion/listar');
+                data = await response.json();
+            }
 
             if (!data.success) {
                 showAlert(t('importacion.errorCargandoArchivos') + ': ' + data.error, 'error');
@@ -78,8 +83,13 @@
         const { estadoImportacion, showInfoToast, showErrorToast, t, leerCSV, leerExcel } = ctx;
         try {
             showInfoToast('⏳ ' + t('importacion.cargandoArchivo'));
-            const response = await fetch(`/api/importacion/contenido/${archivoId}`);
-            const data = await response.json();
+            let data;
+            if (window.electronAPI?.importContent) {
+                data = await window.electronAPI.importContent(archivoId);
+            } else {
+                const response = await fetch(`/api/importacion/contenido/${archivoId}`);
+                data = await response.json();
+            }
 
             if (!data.success) {
                 showErrorToast('❌ ' + t('importacion.errorCargandoArchivo') + ': ' + data.error);
@@ -110,7 +120,30 @@
     async function descargarArchivo(archivoId, ctx) {
         const { showAlert, t } = ctx;
         try {
-            window.location.href = `/api/importacion/descargar/${archivoId}`;
+            let nombre, contenido;
+            if (window.electronAPI?.importContent) {
+                const data = await window.electronAPI.importContent(archivoId);
+                nombre = data.nombre;
+                contenido = data.contenido;
+            } else {
+                const response = await fetch(`/api/importacion/contenido/${archivoId}`);
+                const data = await response.json();
+                if (!data.success) throw new Error(data.error);
+                nombre = data.nombre;
+                contenido = data.contenido;
+            }
+            const binary = atob(contenido);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            const blob = new Blob([bytes], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = nombre || archivoId;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         } catch (error) {
             showAlert(t('importacion.errorDescargandoArchivo') + ': ' + error.message, 'error');
         }
@@ -125,8 +158,13 @@
 
         try {
             showInfoToast('⏳ ' + t('importacion.eliminandoArchivo'));
-            const response = await fetch(`/api/importacion/eliminar/${archivoId}`, { method: 'DELETE' });
-            const data = await response.json();
+            let data;
+            if (window.electronAPI?.importDelete) {
+                data = await window.electronAPI.importDelete(archivoId);
+            } else {
+                const response = await fetch(`/api/importacion/eliminar/${archivoId}`, { method: 'DELETE' });
+                data = await response.json();
+            }
 
             if (!data.success) {
                 showErrorToast('❌ ' + t('importacion.errorEliminandoArchivo') + ': ' + data.error);
@@ -165,19 +203,19 @@
             showInfoToast('⏳ ' + t('importacion.guardandoArchivo'));
 
             const csv = convertirDatosACSV(estadoImportacion.datosRaw);
-            const formData = new FormData();
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
             const nombreArchivo = nombre.replace(/\.[^/.]+$/, '') + '.csv';
-
-            formData.append('archivo', blob, nombreArchivo);
-            formData.append('nombre', nombreArchivo);
-
-            const response = await fetch('/api/importacion/guardar', {
-                method: 'POST',
-                body: formData
-            });
-
-            const data = await response.json();
+            let data;
+            if (window.electronAPI?.importSave) {
+                const contenido = btoa(unescape(encodeURIComponent(csv)));
+                data = await window.electronAPI.importSave({ filename: nombreArchivo, contenido });
+            } else {
+                const formData = new FormData();
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+                formData.append('archivo', blob, nombreArchivo);
+                formData.append('nombre', nombreArchivo);
+                const response = await fetch('/api/importacion/guardar', { method: 'POST', body: formData });
+                data = await response.json();
+            }
             if (!data.success) return;
 
             estadoImportacion.archivoGuardado = true;
@@ -197,19 +235,19 @@
         try {
             showInfoToast('⏳ ' + t('importacion.guardandoArchivo'));
             const csv = convertirDatosACSV(estadoImportacion.datosRaw);
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
             const nombreArchivo = nombre.replace(/\.[^/.]+$/, '') + '.csv';
-
-            const formData = new FormData();
-            formData.append('archivo', blob, nombreArchivo);
-            formData.append('nombre', nombreArchivo);
-
-            const response = await fetch('/api/importacion/guardar', {
-                method: 'POST',
-                body: formData
-            });
-
-            const data = await response.json();
+            let data;
+            if (window.electronAPI?.importSave) {
+                const contenido = btoa(unescape(encodeURIComponent(csv)));
+                data = await window.electronAPI.importSave({ filename: nombreArchivo, contenido });
+            } else {
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+                const formData = new FormData();
+                formData.append('archivo', blob, nombreArchivo);
+                formData.append('nombre', nombreArchivo);
+                const response = await fetch('/api/importacion/guardar', { method: 'POST', body: formData });
+                data = await response.json();
+            }
             if (!data.success) {
                 showErrorToast('❌ ' + t('importacion.errorGuardandoArchivo') + ': ' + data.error);
                 return;

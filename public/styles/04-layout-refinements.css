@@ -189,7 +189,13 @@
     color: #ffffff;
     box-shadow: 0 10px 20px var(--bg-primary-dark);
     border: 1px solid var(--primary-dark);
-    transform: translateY(-1px);
+    transform: translateY(-1px) scale(1.07);
+    animation: sidebarTabActivate 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes sidebarTabActivate {
+    from { transform: translateY(0) scale(0.94); opacity: 0.7; }
+    to   { transform: translateY(-1px) scale(1.07); opacity: 1; }
 }
 
 .sidebar-bottom {
@@ -213,6 +219,49 @@
 .no-titlebar .app-body {
     margin-top: 0;
     min-height: 100vh;
+}
+
+/* ── Tab loading progress bar ───────────────────────── */
+#tab-progress-bar {
+    position: fixed;
+    top: 34px;
+    left: 69px;
+    right: 0;
+    height: 3px;
+    z-index: 99;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.no-titlebar #tab-progress-bar {
+    top: 0;
+}
+
+#tab-progress-bar-inner {
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, var(--primary) 0%, var(--success) 60%, #86efac 100%);
+    border-radius: 0 2px 2px 0;
+    opacity: 0;
+    transition: none;
+}
+
+#tab-progress-bar-inner.bar-start {
+    opacity: 1;
+    width: 72%;
+    transition: width 1.4s cubic-bezier(0.1, 0.4, 0.2, 1), opacity 0.05s;
+}
+
+#tab-progress-bar-inner.bar-done {
+    width: 100%;
+    transition: width 0.15s ease-out;
+    opacity: 1;
+}
+
+#tab-progress-bar-inner.bar-fade {
+    width: 100%;
+    opacity: 0;
+    transition: opacity 0.3s ease 0.1s;
 }
 
 .window-titlebar {
@@ -934,6 +983,19 @@ main {
     font-size: 13px;
 }
 
+@media (max-width: 768px) {
+    .btn-small {
+        min-height: 36px;
+        padding: 8px 14px;
+    }
+
+    .concepto-item input[type="checkbox"] {
+        width: 22px;
+        height: 22px;
+        min-width: 22px;
+    }
+}
+
 .conceptos-list {
     border: 1px solid var(--border-medium);
     border-radius: 8px;
@@ -1165,11 +1227,26 @@ main {
     .app-body {
         margin-left: 0;
         margin-top: 40px;
-        margin-bottom: 72px;
+        margin-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+        padding-bottom: env(safe-area-inset-bottom, 0px);
     }
 
     .window-titlebar {
         left: 0;
+    }
+
+    #tab-progress-bar {
+        top: 40px;
+        left: 0;
+    }
+
+    .no-titlebar #tab-progress-bar {
+        top: 0;
+        left: 0;
+    }
+
+    .sidebar {
+        padding-bottom: env(safe-area-inset-bottom, 0px);
     }
 
     .dashboard-kpis {

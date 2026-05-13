@@ -1109,6 +1109,13 @@
     .date-input {
         font-size: 0.85rem;
         padding: var(--spacing-sm);
+        min-width: 0;
+        width: 100%;
+    }
+
+    .date-slider-group {
+        flex: 1 1 100%;
+        min-width: 0;
     }
 
     .date-slider-header {
@@ -1145,6 +1152,16 @@
     .chart-card h3 {
         font-size: 0.95rem;
         margin-bottom: var(--spacing-md);
+    }
+
+    #dashboard .chart-card canvas {
+        height: 220px !important;
+        max-height: 220px;
+    }
+
+    #dashboard .chart-card.full-width canvas {
+        height: 200px !important;
+        max-height: 200px;
     }
 
     .filtro-categoria {
