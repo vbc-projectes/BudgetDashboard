@@ -287,7 +287,13 @@ TRADUCCIONES.en = {
             errorSinDatos: 'No data to save',
             guardandoArchivo: 'Saving file...',
             errorGuardandoArchivo: 'Error saving file',
-            exitoArchivoGuardado: 'File saved successfully'
+            exitoArchivoGuardado: 'File saved successfully',
+            errorPresetMapeoVacio: 'You must complete a valid mapping before saving a preset',
+            nombrePresetMapeo: 'Mapping preset name:',
+            presetBancoDefault: 'Bank preset',
+            confirmarEliminarPreset: 'Delete this mapping preset?',
+            sinErroresValidacion: 'No validation errors',
+            errorNoFilasValidas: 'No valid rows to continue. Check the validation panel.'
         },
 
         // ===== DASHBOARD =====
@@ -339,7 +345,9 @@ TRADUCCIONES.en = {
             ingresosReales: 'Real Income',
             gastosReales: 'Real Expenses',
             ahorrosReales: 'Real Savings',
-            realesSuffix: 'Real'
+            realesSuffix: 'Real',
+            periodoActivo: 'Active period',
+            ratioAhorro: 'Savings ratio'
         },
 
         // ===== CATEGORÍAS =====
@@ -484,7 +492,12 @@ TRADUCCIONES.en = {
             numeroAccionesInvalido: 'Invalid number of shares',
             precioCompraInvalidoAlt: 'Invalid purchase price',
             verHistorico: 'View historical data',
-            historicalChart: 'Historical data for'
+            historicalChart: 'Historical data for',
+            precioEur: 'Price (€)',
+            fechaEje: 'Date',
+            cargandoPrecio: 'Loading...',
+            errorCargarDatos: 'Error loading data',
+            errorGuardar: 'Error saving'
         },
 
         // ===== IMPUESTOS =====
@@ -537,7 +550,21 @@ TRADUCCIONES.en = {
             placeholderYYYYMM: 'YYYY-MM',
             placeholderNumeroPartes: 'No.',
             formatoYYYYMM: 'Format: YYYY-MM',
-            numeroPartes: 'Number of parts'
+            numeroPartes: 'Number of parts',
+            precio: 'Price',
+            precioVenta: 'Sale price',
+            ticker: 'Ticker',
+            empresa: 'Company',
+            comision: 'Commission',
+            notas: 'Notes',
+            placeholderEmpresaOpc: 'Company (opt.)',
+            placeholderNotasOpc: 'Notes (opt.)',
+            placeholderOpcional: 'Optional',
+            importar: 'Import',
+            importando: 'Importing…',
+            guardando: 'Saving…',
+            completaCampos: 'Please fill in all required fields.',
+            actualizar: 'Update'
         },
 
         // ===== MODALES =====
@@ -594,7 +621,33 @@ TRADUCCIONES.en = {
             anterior: 'Previous',
             primera: 'First',
             ultima: 'Last',
-            porPagina: 'Records per page'
+            porPagina: 'Records per page',
+            ticker: 'Ticker',
+            empresa: 'Company',
+            tipo: 'Type',
+            cantidad: 'Quantity',
+            precioMedio: 'Avg. price',
+            costeTotal: 'Total cost',
+            precioActual: 'Current price',
+            valorActual: 'Current value',
+            pnl: 'P&L',
+            pnlPct: 'P&L %',
+            dividendos: 'Dividends',
+            dividendosNetos: 'Net dividends',
+            precioUnit: 'Unit price',
+            comision: 'Commission',
+            total: 'Total',
+            notas: 'Notes',
+            eurAccion: '€/share',
+            fuente: 'Source',
+            bruto: 'Gross',
+            retencion: 'Withholding',
+            neto: 'Net',
+            precioVenta: 'Sale price',
+            precioCoste: 'Cost price',
+            operaciones: 'Transactions',
+            volumenTotal: 'Total volume (€)',
+            sinDatos: 'No data'
         },
 
         // ===== ERRORES =====
@@ -614,6 +667,96 @@ TRADUCCIONES.en = {
             eliminar: 'Are you sure you want to delete this item?',
             cancelar: 'Do you want to cancel this operation?',
             salirSinGuardar: 'Do you want to exit without saving changes?'
+        },
+
+        // ===== INVERSIONES =====
+        inversiones: {
+            titulo: 'Investments',
+            tabs: {
+                activos: 'Holdings',
+                cartera: 'Portfolio',
+                operaciones: 'Transactions',
+                dividendos: 'Dividends',
+                resumen: 'Summary'
+            },
+            posicionesAbiertas: 'Open positions',
+            actualizarPrecios: 'Update prices',
+            notaPosiciones: 'Positions are calculated automatically from recorded transactions. To add or close a position, use the Transactions tab or the row button.',
+            kpi: {
+                invertido: 'Invested',
+                valorActual: 'Current value',
+                pnlLatente: 'Unrealised P&L',
+                dividendosNetos: 'Net dividends',
+                comisiones: 'Commissions',
+                rentabilidadTotal: 'Total return',
+                gpRealizado: 'Realised G/L',
+                rendimientoTotal: 'Total return €',
+                totalOps: 'Total transactions',
+                compras: 'Buys',
+                ventas: 'Sells',
+                tickersUnicos: 'Unique tickers',
+                gpTotalVentas: 'Total G/L sales'
+            },
+            distribucionCartera: 'Portfolio allocation',
+            sinPosiciones: 'No positions',
+            rendimientoPorActivo: 'Return per asset (P&L €)',
+            sinDatosPnl: 'No P&L data',
+            rendimientoHistorico: 'Portfolio historical return',
+            rendimientoEnPeriodo: 'return in selected period',
+            cargandoHistorico: 'Loading historical data...',
+            sinDatosHistoricos: 'No historical data. Add transactions to see performance.',
+            operaciones: 'Transactions',
+            importarCSV: 'Import CSV',
+            compra: 'Buy',
+            venta: 'Sell',
+            dividendosCobrados: 'Dividends received',
+            sincronizarYahoo: 'Sync from Yahoo',
+            notaDividendos: 'Dividends are calculated automatically based on shares held on each payment date.',
+            resumenOperaciones: 'Transaction summary',
+            mejoresVentasPct: '🏆 Best sells by %',
+            peoresVentasPct: '💀 Worst sells by %',
+            mejoresVentasEur: 'Best sells by €',
+            peoresVentasEur: 'Worst sells by €',
+            accionesMasMovidas: 'Most traded stocks',
+            cerrarPosicion: 'Close position',
+            notaCerrarPosicion: 'A sell transaction will be recorded with the provided data.',
+            confirmarVenta: 'Confirm sale',
+            importarOperaciones: 'Import transactions',
+            sinPosicionesAbiertas: 'No open positions. Add buy transactions.',
+            sinOperaciones: 'No transactions recorded',
+            sinDividendos: 'No dividends. Press "Sync" to fetch from Yahoo Finance.',
+            sincronizando: 'Syncing…',
+            sinDividendosEncontrados: 'No dividends found',
+            posicionCerrada: 'Position {ticker} closed',
+            camposObligatorios: 'Ticker, date, quantity and price are required.',
+            confirmarEliminarOp: 'Delete this transaction?',
+            sinOperacionesSeleccionadas: 'No transactions selected.',
+            operacionesImportadas: '{n} transaction(s) imported successfully',
+            operacionesFallaron: '{n} transaction(s) failed to import',
+            sinOperacionesEnArchivo: 'No buy/sell transactions found in the file.',
+            sinDatos: 'No data',
+            cargando: 'Loading…'
+        },
+
+        // ===== BOLSA =====
+        bolsa: {
+            titulo: 'Market',
+            tabs: {
+                cartera: 'Portfolio',
+                operaciones: 'Transactions',
+                dividendos: 'Dividends'
+            },
+            resumenCartera: 'Portfolio Summary',
+            operaciones: 'Transactions',
+            dividendos: 'Dividends',
+            obteniendoPrecios: 'Fetching prices...',
+            sinPosiciones: 'No open positions',
+            sinOperaciones: 'No transactions recorded',
+            sinDividendos: 'No dividends recorded',
+            camposObligatorios: 'Ticker, date, quantity and price are required.',
+            camposDividendoObligatorios: 'Ticker, date and gross amount are required.',
+            confirmarEliminarOp: 'Delete this transaction?',
+            confirmarEliminarDiv: 'Delete this dividend?'
         }
 };
 

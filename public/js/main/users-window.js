@@ -47,6 +47,9 @@ async function initWindowControls() {
         return;
     }
 
+    // Show titlebar for Electron on Windows / Linux
+    titlebar.style.display = '';
+
     minimizeBtn.addEventListener('click', async () => {
         try {
             await api.windowMinimize();

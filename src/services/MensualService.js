@@ -12,6 +12,17 @@ class MensualService extends BaseService {
     }
 
     /**
+     * Override add to validate that desde <= hasta before inserting.
+     */
+    async add(data) {
+        const { desde, hasta } = data || {};
+        if (desde && hasta && String(desde) > String(hasta)) {
+            throw new Error('desde no puede ser posterior a hasta');
+        }
+        return super.add(data);
+    }
+
+    /**
      * Get total for a date range
      * @param {string} desde - Start date
      * @param {string} hasta - End date

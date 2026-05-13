@@ -1,0 +1,27 @@
+# Build artifacts
+node_modules/
+build/
+dist/
+
+# Electron build outputs
+*.exe
+*.dmg
+*.AppImage
+*.deb
+*.snap
+
+# User data (mounted as Docker volume)
+usuarios/
+
+# Local databases
+*.db
+*.sqlite
+
+# Environment secrets
+.env
+
+# Development
+.git/
+*.log
+coverage/
+.nyc_output/

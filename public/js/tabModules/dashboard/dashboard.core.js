@@ -587,13 +587,13 @@ function actualizarResumenKpis({ totalIngresos = 0, totalGastosConImpuestos = 0,
     const hastaDate = parsearFechaInput(hasta);
     const periodoTexto = (desdeDate && hastaDate)
         ? `${formatearFechaDisplay(desdeDate)} - ${formatearFechaDisplay(hastaDate)}`
-        : 'Periodo activo';
+        : (typeof gestorIdiomas !== 'undefined' ? gestorIdiomas.obtenerTexto('dashboard.periodoActivo') : 'Periodo activo');
 
     if (kpiIngresos) kpiIngresos.textContent = formatearEuro(totalIngresos);
     if (kpiGastos) kpiGastos.textContent = formatearEuro(totalGastosConImpuestos);
     if (kpiAhorros) kpiAhorros.textContent = formatearEuro(totalAhorros);
     if (kpiNeto) kpiNeto.textContent = formatearEuro(ingresoNeto);
-    if (kpiRatio) kpiRatio.textContent = `Ratio ahorro ${ratioAhorro.toFixed(1)}%`;
+    if (kpiRatio) kpiRatio.textContent = `${typeof gestorIdiomas !== 'undefined' ? gestorIdiomas.obtenerTexto('dashboard.ratioAhorro') : 'Ratio ahorro'} ${ratioAhorro.toFixed(1)}%`;
     if (kpiPeriodoIngresos) kpiPeriodoIngresos.textContent = periodoTexto;
     if (kpiPeriodoGastos) kpiPeriodoGastos.textContent = periodoTexto;
     if (kpiPeriodoNeto) kpiPeriodoNeto.textContent = periodoTexto;

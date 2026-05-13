@@ -506,3 +506,15 @@ function initTableSearchers(scope = document) {
     tables.forEach((table) => attachTableSearch(table));
 }
 
+/**
+ * Disconnect all MutationObservers registered by table searchers.
+ * Call this before swapping tab content to prevent stale observers from
+ * accumulating and leaking memory.
+ */
+window.__tableSearchCleanup = function() {
+    tableSearchRegistry.forEach(({ observer }) => {
+        try { observer.disconnect(); } catch (_) {}
+    });
+    tableSearchRegistry.clear();
+};
+

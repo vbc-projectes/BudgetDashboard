@@ -7,7 +7,6 @@
     <button class="subtab-btn" data-target="ingresosMensuales" data-i18n="ingresos.mensuales">Mensuales</button>
     <button class="subtab-btn" data-target="cuentaRemunerada" data-i18n="ingresos.cuenta_remunerada">Cuenta
       Remunerada</button>
-    <button class="subtab-btn" data-target="assets" data-i18n="ingresos.assets">Assets</button>
     <button class="subtab-btn" data-target="ingresosReales" data-i18n="dashboard.ingresosReales">Ingresos
       Reales</button>
   </div>
@@ -182,49 +181,6 @@
     </div>
   </div>
 
-  <!-- ASSETS (ACCIONES) -->
-  <div id="assets" class="subtab display-none">
-    <h3 data-i18n="ingresos.assets">Assets (Acciones)</h3>
-    <div class="table-container">
-      <table id="tablaAssets">
-        <thead>
-          <tr>
-            <th data-i18n="ingresos.company">Company</th>
-            <th data-i18n="ingresos.ticker">Ticker</th>
-            <th data-i18n="ingresos.shares">Acciones</th>
-            <th data-i18n="ingresos.purchasePrice">Precio Compra</th>
-            <th data-i18n="ingresos.totalInvestment">Total Invertido</th>
-            <th data-i18n="ingresos.currentPrice">Precio Actual</th>
-            <th data-i18n="ingresos.currentValue">Valor Actual</th>
-            <th data-i18n="ingresos.diffPercent">Dif. %</th>
-            <th data-i18n="ingresos.diffAmount">Dif. €</th>
-            <th class="w-150" data-i18n="tablas.acciones">Acciones</th>
-          </tr>
-          <tr class="insert-row">
-            <td><input type="text" id="companyAsset" data-i18n-placeholder="ingresos.placeholderCompany"></td>
-            <td><input type="text" id="tickerAsset" data-i18n-placeholder="ingresos.placeholderTicker"></td>
-            <td>
-              <input type="number" id="sharesAsset" step="0.01" data-i18n-placeholder="ingresos.placeholderShares">
-            </td>
-            <td>
-              <div class="input-euro">
-                <span>€</span>
-                <input type="number" id="purchasePriceAsset" step="0.01"
-                  data-i18n-placeholder="ingresos.placeholderPrice">
-              </div>
-            </td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td><button id="btnAgregarAsset"><i class="fas fa-plus"></i></button></td>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </div>
 
   <!-- INGRESOS REALES -->
   <div id="ingresosReales" class="subtab display-none">
@@ -262,71 +218,3 @@
     </table>
   </div>
 </section>
-
-<!-- Modal para confirmar venta de asset -->
-<div id="sellAssetModal" class="modal-overlay">
-  <div class="modal-content">
-    <h3 class="modal-title" data-i18n="ingresos.sellAsset">Vender Asset</h3>
-    <div class="modal-field">
-      <p><strong data-i18n="ingresos.company">Company:</strong> <span id="sellCompany"></span></p>
-      <p><strong data-i18n="ingresos.ticker">Ticker:</strong> <span id="sellTicker"></span></p>
-      <p><strong data-i18n="ingresos.shares">Acciones:</strong> <span id="sellShares"></span></p>
-      <p><strong data-i18n="ingresos.purchasePrice">Precio Compra:</strong> <span id="sellPurchasePrice"></span></p>
-      <p><strong data-i18n="ingresos.currentPrice">Precio Actual:</strong> <span id="sellCurrentPrice"></span></p>
-    </div>
-    <div class="modal-field">
-      <label class="modal-label" data-i18n="ingresos.salePrice">Precio de Venta:</label>
-      <div class="input-euro">
-        <span>€</span>
-        <input type="number" id="sellPrice" step="0.01" data-i18n-placeholder="ingresos.placeholderMonto"
-          class="modal-input">
-      </div>
-    </div>
-    <div class="modal-info-box">
-      <p><strong data-i18n="ingresos.totalInvestment">Total Invertido:</strong> <span id="sellTotalInvested"></span></p>
-      <p><strong data-i18n="ingresos.saleValue">Valor Venta:</strong> <span id="sellTotalValue"></span></p>
-      <p class="modal-profit-text"><strong data-i18n="ingresos.profit">Ganancia/Pérdida:</strong> <span id="sellProfit"
-          class="modal-profit"></span></p>
-    </div>
-    <div class="flex-end">
-      <button id="cancelSellBtn" class="btn-modal-cancel" data-i18n="formularios.cancelar">Cancelar</button>
-      <button id="confirmSellBtn" class="btn-modal-confirm" data-i18n="ingresos.confirmSale">Confirmar Venta</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal para mostrar gráfico histórico del ticker -->
-<div id="assetHistoryModal" class="modal-overlay">
-  <div class="modal-content" style="max-width: 900px; width: 90%;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-      <h3 class="modal-title">
-        <span data-i18n="ingresos.historicalChart">Histórico de</span>
-        <span id="historyTickerName"></span>
-      </h3>
-      <button id="closeHistoryBtn" class="btn-modal-cancel" style="padding: 8px 16px;">
-        <i class="fas fa-times"></i>
-      </button>
-    </div>
-
-    <!-- Selectores de período -->
-    <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
-      <button class="period-btn active" data-period="1mo">1 mes</button>
-      <button class="period-btn" data-period="3mo">3 meses</button>
-      <button class="period-btn" data-period="6mo">6 meses</button>
-      <button class="period-btn" data-period="1y">1 año</button>
-      <button class="period-btn" data-period="2y">2 años</button>
-      <button class="period-btn" data-period="5y">5 años</button>
-    </div>
-
-    <!-- Contenedor del gráfico -->
-    <div style="position: relative; height: 400px;">
-      <canvas id="assetHistoryChart"></canvas>
-    </div>
-
-    <!-- Indicador de carga -->
-    <div id="historyChartLoading" style="display: none; text-align: center; padding: 20px;">
-      <i class="fas fa-spinner fa-spin" style="font-size: 24px;"></i>
-      <p style="margin-top: 10px;">Cargando datos...</p>
-    </div>
-  </div>
-</div>
