@@ -215,6 +215,25 @@ function cleanPreviousBuilds() {
   }
 }
 
+const DOCKER_USER = 'cpachecoperello';
+const DOCKER_IMAGE = `${DOCKER_USER}/dashboardeconomic`;
+
+function buildAndPushDocker(version) {
+  const tagVersioned = `${DOCKER_IMAGE}:${version}`;
+  const tagLatest = `${DOCKER_IMAGE}:latest`;
+
+  console.log(`\nConstruyendo imagen Docker: ${tagVersioned}`);
+  run('docker', ['build', '-t', tagVersioned, '-t', tagLatest, '.']);
+
+  console.log(`\nPublicando imagen: ${tagVersioned}`);
+  run('docker', ['push', tagVersioned]);
+
+  console.log(`\nPublicando imagen: ${tagLatest}`);
+  run('docker', ['push', tagLatest]);
+
+  console.log(`Imagen Docker publicada: ${tagVersioned}`);
+}
+
 async function main() {
   if (!fs.existsSync(packageJsonPath)) {
     throw new Error('No se encontro package.json en la raiz del proyecto.');
@@ -254,6 +273,8 @@ async function main() {
   run('git', ['tag', tag]);
   run('git', ['push', 'origin']);
   run('git', ['push', 'origin', tag]);
+
+  buildAndPushDocker(nextVersion);
 
   console.log(`Proceso completado. Tag publicado: ${tag}`);
 }
