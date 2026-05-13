@@ -983,6 +983,19 @@ main {
     font-size: 13px;
 }
 
+@media (max-width: 768px) {
+    .btn-small {
+        min-height: 36px;
+        padding: 8px 14px;
+    }
+
+    .concepto-item input[type="checkbox"] {
+        width: 22px;
+        height: 22px;
+        min-width: 22px;
+    }
+}
+
 .conceptos-list {
     border: 1px solid var(--border-medium);
     border-radius: 8px;
@@ -1214,11 +1227,26 @@ main {
     .app-body {
         margin-left: 0;
         margin-top: 40px;
-        margin-bottom: 72px;
+        margin-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+        padding-bottom: env(safe-area-inset-bottom, 0px);
     }
 
     .window-titlebar {
         left: 0;
+    }
+
+    #tab-progress-bar {
+        top: 40px;
+        left: 0;
+    }
+
+    .no-titlebar #tab-progress-bar {
+        top: 0;
+        left: 0;
+    }
+
+    .sidebar {
+        padding-bottom: env(safe-area-inset-bottom, 0px);
     }
 
     .dashboard-kpis {

@@ -1033,6 +1033,14 @@ table {
     padding: var(--spacing-lg) var(--spacing-md);
 }
 
+@media (max-width: 768px) {
+    #tablaAssets th,
+    #tablaAssets td {
+        padding: 0.5rem 0.6rem;
+        font-size: 0.78rem;
+    }
+}
+
 #tablaAssets th:first-child,
 #tablaAssets td:first-child {
     position: sticky;
