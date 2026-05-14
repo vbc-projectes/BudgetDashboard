@@ -22,7 +22,16 @@ module.exports = {
     CORS_ORIGIN: process.env.CORS_ORIGIN || '*',
     
     // Reverse proxy: número de proxies de confianza (1 para Nginx/Caddy/Traefik)
-    TRUST_PROXY: process.env.TRUST_PROXY || (process.env.NODE_ENV === 'production' ? 1 : false),
+    // Docker env vars arrive as strings — convert numeric strings to Number so Express
+    // treats it as a hop count (not as an IP/subnet string)
+    TRUST_PROXY: (() => {
+        const val = process.env.TRUST_PROXY;
+        if (val === undefined || val === '') {
+            return process.env.NODE_ENV === 'production' ? 1 : false;
+        }
+        const num = Number(val);
+        return isNaN(num) ? val : num; // string IP/preset passthrough if not numeric
+    })(),
 
     // Entorno
     NODE_ENV: process.env.NODE_ENV || 'development'

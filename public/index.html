@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; font-src 'self' https://cdnjs.cloudflare.com; connect-src 'self' https://api.exchangerate-api.com https://query2.finance.yahoo.com https://cdn.jsdelivr.net; img-src 'self' data:;">
+    <!-- CSP is set dynamically via HTTP header in server.js (web mode) -->
+    <!-- Electron mode uses its own CSP via webPreferences -->
     <title data-i18n="app.tituloPagina">Dashboard Económico</title>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
