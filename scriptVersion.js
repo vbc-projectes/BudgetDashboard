@@ -224,6 +224,32 @@ function cleanPreviousBuilds() {
   }
 }
 
+function createGithubRelease(tag, isPrerelease) {
+  const args = ['release', 'create', tag, '--title', tag];
+
+  if (isPrerelease) {
+    args.push('--prerelease');
+  } else {
+    args.push('--latest');
+  }
+
+  if (fs.existsSync(releaseNotesPath)) {
+    const notes = JSON.parse(fs.readFileSync(releaseNotesPath, 'utf8'));
+    const lines = [];
+    if (notes.newFeatures && notes.newFeatures.length > 0) {
+      lines.push('## New Features');
+      notes.newFeatures.forEach((f) => lines.push(`- ${f}`));
+    }
+    if (notes.bugFixes && notes.bugFixes.length > 0) {
+      lines.push('## Bug Fixes');
+      notes.bugFixes.forEach((f) => lines.push(`- ${f}`));
+    }
+    args.push('--notes', lines.length > 0 ? lines.join('\n') : '');
+  }
+
+  run('gh', args);
+}
+
 const DOCKER_USER = 'cpachecoperello';
 const DOCKER_IMAGE = `${DOCKER_USER}/dashboardeconomic`;
 
@@ -286,6 +312,8 @@ async function main() {
   run('git', ['tag', tag]);
   run('git', ['push', 'origin']);
   run('git', ['push', 'origin', tag]);
+
+  createGithubRelease(tag, tagSuffix !== '');
 
   buildAndPushDocker(nextVersion, tagSuffix);
 
