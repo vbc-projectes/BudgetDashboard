@@ -167,13 +167,22 @@ function tagExistsRemote(tag) {
   return Boolean((result.stdout || '').trim());
 }
 
-function getNextAvailableVersion(currentVersion, bumpType) {
+function getCurrentBranch() {
+  const result = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+    encoding: 'utf8',
+    shell: false,
+  });
+  if (result.error || result.status !== 0) return 'main';
+  return (result.stdout || '').trim();
+}
+
+function getNextAvailableVersion(currentVersion, bumpType, tagSuffix) {
   let candidateVersion = incrementVersion(currentVersion, bumpType);
-  let candidateTag = `v${candidateVersion}`;
+  let candidateTag = `v${candidateVersion}${tagSuffix}`;
 
   while (tagExistsLocal(candidateTag) || tagExistsRemote(candidateTag)) {
     candidateVersion = incrementVersion(candidateVersion, bumpType);
-    candidateTag = `v${candidateVersion}`;
+    candidateTag = `v${candidateVersion}${tagSuffix}`;
   }
 
   return candidateVersion;
@@ -218,18 +227,19 @@ function cleanPreviousBuilds() {
 const DOCKER_USER = 'cpachecoperello';
 const DOCKER_IMAGE = `${DOCKER_USER}/dashboardeconomic`;
 
-function buildAndPushDocker(version) {
-  const tagVersioned = `${DOCKER_IMAGE}:${version}`;
-  const tagLatest = `${DOCKER_IMAGE}:latest`;
+function buildAndPushDocker(version, tagSuffix) {
+  const tagVersioned = `${DOCKER_IMAGE}:${version}${tagSuffix}`;
+  // develop branch -> 'develop' floating tag; main -> 'latest'
+  const tagFloating = tagSuffix ? `${DOCKER_IMAGE}:develop` : `${DOCKER_IMAGE}:latest`;
 
   console.log(`\nConstruyendo imagen Docker: ${tagVersioned}`);
-  run('docker', ['build', '-t', tagVersioned, '-t', tagLatest, '.']);
+  run('docker', ['build', '-t', tagVersioned, '-t', tagFloating, '.']);
 
   console.log(`\nPublicando imagen: ${tagVersioned}`);
   run('docker', ['push', tagVersioned]);
 
-  console.log(`\nPublicando imagen: ${tagLatest}`);
-  run('docker', ['push', tagLatest]);
+  console.log(`\nPublicando imagen: ${tagFloating}`);
+  run('docker', ['push', tagFloating]);
 
   console.log(`Imagen Docker publicada: ${tagVersioned}`);
 }
@@ -244,8 +254,10 @@ async function main() {
   const bumpType = await askBumpType();
   const newFeatures = await askList('New features');
   const bugFixes = await askList('Bug fixes');
-  const nextVersion = getNextAvailableVersion(currentVersion, bumpType);
-  const tag = `v${nextVersion}`;
+  const branch = getCurrentBranch();
+  const tagSuffix = branch === 'develop' ? '-snapshot' : '';
+  const nextVersion = getNextAvailableVersion(currentVersion, bumpType, tagSuffix);
+  const tag = `v${nextVersion}${tagSuffix}`;
 
   packageData.version = nextVersion;
   fs.writeFileSync(packageJsonPath, `${JSON.stringify(packageData, null, 2)}\n`, 'utf8');
@@ -253,6 +265,7 @@ async function main() {
 
   console.log(`Version actual: ${currentVersion}`);
   console.log(`Nueva version: ${nextVersion}`);
+  console.log(`Rama: ${branch}${tagSuffix ? '  ->  tag con sufijo "' + tagSuffix + '"' : ''}`);
   if (nextVersion !== incrementVersion(currentVersion, bumpType)) {
     console.log(`Se detectaron tags existentes, se uso el siguiente ${bumpType} disponible.`);
   }
@@ -274,7 +287,7 @@ async function main() {
   run('git', ['push', 'origin']);
   run('git', ['push', 'origin', tag]);
 
-  buildAndPushDocker(nextVersion);
+  buildAndPushDocker(nextVersion, tagSuffix);
 
   console.log(`Proceso completado. Tag publicado: ${tag}`);
 }
