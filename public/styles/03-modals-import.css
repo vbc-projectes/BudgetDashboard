@@ -817,7 +817,7 @@
 
 .graficos-container {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 500px), 1fr));
     gap: var(--spacing-2xl);
     margin: var(--spacing-2xl) 0;
 }
@@ -840,7 +840,6 @@
 .chart-box canvas {
     height: 300px;
     max-height: 300px;
-    min-height: 300px;
     width: 100% !important;
     flex: 0 0 300px;
 }
