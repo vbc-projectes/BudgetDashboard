@@ -419,6 +419,8 @@
     box-shadow: var(--shadow-sm);
     transition: var(--transition);
     border: 1px solid #d8deef;
+    min-width: 0;
+    overflow: hidden;
 }
 
 

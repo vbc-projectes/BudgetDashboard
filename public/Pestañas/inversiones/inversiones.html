@@ -60,19 +60,19 @@
     </div>
 
     <!-- Rendimiento por activo: donut + barras -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;">
+    <div class="inv-2col-grid" style="gap:20px;margin-bottom:24px;">
       <div class="inv-chart-card">
         <h4 data-i18n="inversiones.distribucionCartera">Distribución de cartera</h4>
-        <div style="position:relative;height:280px;display:flex;align-items:center;justify-content:center;">
+        <div style="position:relative;height:280px;">
           <canvas id="invChartAllocation"></canvas>
-          <div id="invChartAllocationEmpty" style="display:none;color:var(--color-muted,#888);font-size:13px;" data-i18n="inversiones.sinPosiciones">Sin posiciones</div>
+          <div id="invChartAllocationEmpty" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;color:var(--color-muted,#888);font-size:13px;" data-i18n="inversiones.sinPosiciones">Sin posiciones</div>
         </div>
       </div>
       <div class="inv-chart-card">
         <h4 data-i18n="inversiones.rendimientoPorActivo">Rendimiento por activo (P&amp;L €)</h4>
-        <div style="position:relative;height:280px;display:flex;align-items:center;justify-content:center;">
+        <div style="position:relative;height:280px;">
           <canvas id="invChartPnl"></canvas>
-          <div id="invChartPnlEmpty" style="display:none;color:var(--color-muted,#888);font-size:13px;" data-i18n="inversiones.sinDatosPnl">Sin datos de P&amp;L</div>
+          <div id="invChartPnlEmpty" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;color:var(--color-muted,#888);font-size:13px;" data-i18n="inversiones.sinDatosPnl">Sin datos de P&amp;L</div>
         </div>
       </div>
     </div>
@@ -208,7 +208,7 @@
     </div>
 
     <!-- Top/Bottom % -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+    <div class="inv-2col-grid" style="gap:16px;margin-bottom:16px;">
       <div class="inv-chart-card">
         <h4 style="margin:0 0 10px;" data-i18n="inversiones.mejoresVentasPct">&#127942; Mejores ventas por %</h4>
         <div class="table-container" style="max-height:260px;">
@@ -230,7 +230,7 @@
     </div>
 
     <!-- Top/Bottom € -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+    <div class="inv-2col-grid" style="gap:16px;margin-bottom:16px;">
       <div class="inv-chart-card">
         <h4 style="margin:0 0 10px;" data-i18n="inversiones.mejoresVentasEur">&#128176; Mejores ventas por €</h4>
         <div class="table-container" style="max-height:260px;">

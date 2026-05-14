@@ -84,6 +84,12 @@ function _showSubtab(targetId) {
     if (btn) btn.classList.add('active');
     const panel = document.getElementById(targetId);
     if (panel) panel.classList.remove('display-none');
+    // Resize charts after panel becomes visible (display:none causes 0×0 render)
+    requestAnimationFrame(() => {
+        if (_inv.chartAlloc) _inv.chartAlloc.resize();
+        if (_inv.chartPnl)   _inv.chartPnl.resize();
+        if (_inv.chartEvol)  _inv.chartEvol.resize();
+    });
 }
 
 // ── Sub-tab ACTIVOS: render open positions (read-only) ─────────────────
@@ -200,7 +206,7 @@ function _renderAllocationChart(allocData) {
     const labels = Object.keys(allocData);
     if (!labels.length) {
         canvas.style.display = 'none';
-        if (emptyEl) emptyEl.style.display = 'block';
+        if (emptyEl) emptyEl.style.display = 'flex';
         return;
     }
     if (emptyEl) emptyEl.style.display = 'none';
@@ -232,7 +238,7 @@ function _renderPnlChart(pnlData) {
     const labels = Object.keys(pnlData);
     if (!labels.length) {
         canvas.style.display = 'none';
-        if (emptyEl) emptyEl.style.display = 'block';
+        if (emptyEl) emptyEl.style.display = 'flex';
         return;
     }
     if (emptyEl) emptyEl.style.display = 'none';

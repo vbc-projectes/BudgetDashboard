@@ -60,6 +60,7 @@
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
                     plugins: { legend: { position: 'top' } },
                     scales: { y: { beginAtZero: true } }
                 }
@@ -164,6 +165,7 @@
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
                     plugins: { legend: { position: 'top' } },
                     scales: { y: { beginAtZero: true } }
                 }
@@ -208,6 +210,7 @@
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
                     plugins: { legend: { position: 'top' } },
                     scales: { y: { beginAtZero: true } }
                 }
