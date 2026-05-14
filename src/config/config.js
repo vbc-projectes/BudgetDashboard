@@ -18,9 +18,12 @@ module.exports = {
     EXCHANGE_RATE_CACHE: 60 * 60 * 1000, // 1 hora
     
     // Seguridad
-    // Default: allow only localhost in dev; set CORS_ORIGIN env var in production
-    CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    // En producción con reverse proxy: CORS_ORIGIN=https://tu-dominio.com
+    CORS_ORIGIN: process.env.CORS_ORIGIN || '*',
     
+    // Reverse proxy: número de proxies de confianza (1 para Nginx/Caddy/Traefik)
+    TRUST_PROXY: process.env.TRUST_PROXY || (process.env.NODE_ENV === 'production' ? 1 : false),
+
     // Entorno
     NODE_ENV: process.env.NODE_ENV || 'development'
 };

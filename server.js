@@ -19,6 +19,11 @@ const routes = require('./src/routes/index');
 
 const app = express();
 
+// ── Trust proxy (Nginx / Caddy / Traefik) ───────────────────────────
+if (config.TRUST_PROXY) {
+    app.set('trust proxy', config.TRUST_PROXY);
+}
+
 // ── Body parsers ────────────────────────────────────────────────────
 app.use(express.json({ limit: config.BODY_LIMIT }));
 app.use(express.urlencoded({ extended: false, limit: config.BODY_LIMIT }));

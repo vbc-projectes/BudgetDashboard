@@ -10,6 +10,8 @@ services:
     restart: unless-stopped
     ports:
       # CAMBIAR: puerto externo si el 3000 ya está ocupado en el server (ej: "8080:3000")
+      # Si usas reverse proxy (Nginx/Caddy/Traefik), puedes exponer sólo al localhost:
+      # - "127.0.0.1:3000:3000"
       - "3000:3000"
     volumes:
       # Volumen gestionado por Docker (recomendado, datos en /var/lib/docker/volumes/)
@@ -23,7 +25,10 @@ services:
       # CAMBIAR: limita las filas devueltas por consulta si el server tiene poca RAM
       QUERY_LIMIT: 2000
       # CAMBIAR: pon el dominio o IP pública del server (ej: https://mi-dominio.com)
+      # Usa '*' para permitir cualquier origen (no recomendado en producción)
       CORS_ORIGIN: "*"
+      # Reverse proxy: 1 para Nginx/Caddy/Traefik (habilita X-Forwarded-* headers)
+      TRUST_PROXY: 1
 
 volumes:
   # Solo necesario si usas el volumen gestionado (no bind mount)
