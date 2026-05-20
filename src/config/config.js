@@ -18,8 +18,8 @@ module.exports = {
     EXCHANGE_RATE_CACHE: 60 * 60 * 1000, // 1 hora
     
     // Seguridad
-    // En producción con reverse proxy: CORS_ORIGIN=https://tu-dominio.com
-    CORS_ORIGIN: process.env.CORS_ORIGIN || '*',
+    // En producción con reverse proxy: CORS_ORIGIN=https://tu-dominio.com (sin barra final)
+    CORS_ORIGIN: (process.env.CORS_ORIGIN || '*').replace(/\/$/, ''),
     
     // Reverse proxy: número de proxies de confianza (1 para Nginx/Caddy/Traefik)
     // Docker env vars arrive as strings — convert numeric strings to Number so Express

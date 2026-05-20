@@ -38,4 +38,20 @@ router.use('/', require('./users'));
 router.use('/', require('./importacion'));
 router.use('/', require('./bolsa'));
 
+// ── Health / diagnostics ──────────────────────────────────────────────
+router.get('/api/health', (req, res) => {
+    res.json({
+        status: 'ok',
+        protocol: req.protocol,         // 'https' if trust proxy working
+        secure: req.secure,
+        ip: req.ip,
+        hostname: req.hostname,
+        forwarded: {
+            proto: req.headers['x-forwarded-proto'],
+            for: req.headers['x-forwarded-for'],
+            host: req.headers['x-forwarded-host'],
+        },
+    });
+});
+
 module.exports = router;
