@@ -181,6 +181,7 @@ window.API = {
             'GET:/bolsa/estadisticas':             () => api.bolsaGetEstadisticas(),
             'POST:/bolsa/sync-dividendos':         () => api.bolsaSyncDividendos(),
             'GET:/bolsa/cuenta-remunerada/saldo-diario': () => api.bolsaGetCRSaldoDiario(),
+            'GET:/cuenta-remunerada/saldo-hoy':           () => api.getCRSaldoHoy(),
         };
 
         const exactKey = `${method}:${basePath}`;

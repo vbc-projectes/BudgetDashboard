@@ -1079,13 +1079,8 @@ async function loadCuentaRemuneradaTab() {
     // KPIs
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     if (data && data.cuenta) {
-        // Saldo disponible = último punto de la serie hasta hoy (igual que el gráfico)
-        const _todayStr = new Date().toISOString().slice(0, 10);
-        const _serieHoy = (data.saldoSeries || []).filter(p => p.fecha <= _todayStr);
-        const _saldoDisp = _serieHoy.length > 0
-            ? _serieHoy[_serieHoy.length - 1].saldo
-            : (data.saldoActual || 0);
-        set('invCRSaldo',       _fmt(_saldoDisp));
+        // saldoHoy = saldo en min(hoy, fechaFin) — calculado en CuentaRemuneradaService
+        set('invCRSaldo',       _fmt(data.saldoHoy || 0));
         set('invCRInvertido',   _fmt(data.saldoInvertido));
         set('invCRInteresBruto',_fmt(data.interesAcumuladoBruto));
         set('invCRInteresNeto', _fmt(data.interesAcumuladoNeto));

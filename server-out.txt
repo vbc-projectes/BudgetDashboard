@@ -1,0 +1,6 @@
+🚀 DashboardEconomic web server running on http://localhost:3000
+   NODE_ENV: development
+   USERS_ROOT: usuarios
+   Resuming as user: Carlos
+🔄 Verificando migraciones...
+✅ Todas las migraciones están actualizadas

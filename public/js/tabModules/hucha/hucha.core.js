@@ -34,64 +34,17 @@ async function cargarHucha() {
             }
             return fallback || key;
         },
-
-        isCuentaRemuneradaActiva(cr, mesActual) {
-            if (!cr || !cr.desde || !cr.hasta) return false;
-            return cr.desde <= mesActual && mesActual <= cr.hasta;
-        },
-
-        calcularSaldoCuentaRemunerada(cr, mesActual) {
-            const monto = parseFloat(cr.monto) || 0;
-            const aportacion = parseFloat(cr.aportacion_mensual) || 0;
-            const interes = parseFloat(cr.interes) || 0;
-            const retencion = parseFloat(cr.retencion) || 0;
-            if (!cr.desde || !mesActual) return monto;
-
-            const [desdeY, desdeM] = cr.desde.split('-').map(Number);
-            const [actualY, actualM] = mesActual.split('-').map(Number);
-
-            const desdeDate = new Date(desdeY, desdeM - 1, 1);
-            const actualMonthDate = new Date(actualY, actualM - 1, 1);
-            const mesInteresDate = new Date(actualY, actualM - 2, 1); // interés hasta fin del mes anterior
-
-            const monthsDiff =
-                (actualMonthDate.getFullYear() - desdeDate.getFullYear()) * 12 +
-                (actualMonthDate.getMonth() - desdeDate.getMonth());
-
-            const aportacionesAcumuladas = Math.max(0, monthsDiff) * aportacion;
-
-            let totalInteres = 0;
-            if (interes > 0 && mesInteresDate >= desdeDate) {
-                let saldoInteres = monto;
-                const current = new Date(desdeDate);
-
-                totalInteres += saldoInteres * (interes / 100) / 12;
-                current.setMonth(current.getMonth() + 1);
-
-                while (current <= mesInteresDate) {
-                    saldoInteres += aportacion;
-                    totalInteres += saldoInteres * (interes / 100) / 12;
-                    current.setMonth(current.getMonth() + 1);
-                }
-            }
-
-            // Aplicar retención: solo se recibe el interés neto
-            const interesNeto = totalInteres * (1 - retencion / 100);
-            return monto + aportacionesAcumuladas + interesNeto;
-        },
         
         async loadData() {
-            const [resHucha, resCR, resBolsaPos] = await Promise.all([
+            const [resHucha, resCRSaldo, resBolsaPos] = await Promise.all([
                 fetch('/hucha'),
-                fetch('/cuenta_remunerada'),
+                fetch('/cuenta-remunerada/saldo-hoy'),
                 fetch('/bolsa/posiciones')
             ]);
 
             const data = resHucha.ok ? await resHucha.json() : [];
-            const cuentasRemuneradas = resCR.ok ? await resCR.json() : [];
+            const crResumen = resCRSaldo.ok ? await resCRSaldo.json() : null;
             const bolsaPosiciones = resBolsaPos.ok ? await resBolsaPos.json() : [];
-            const now = new Date();
-            const mesActual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
             
             this.tbody.innerHTML = '';
             data.forEach(item => {
@@ -112,22 +65,19 @@ async function cargarHucha() {
                 this.tbody.appendChild(tr);
             });
 
-            // Agregar cuentas remuneradas activas como filas solo lectura
-            cuentasRemuneradas
-                .filter(cr => this.isCuentaRemuneradaActiva(cr, mesActual))
-                .forEach(cr => {
-                    const tr = document.createElement('tr');
-                    tr.dataset.auto = 'true';
-                    const labelCuenta = this.t('ingresos.cuenta_remunerada', 'Cuenta remunerada');
-                    const descripcion = cr.descripcion || cr.categoria || `${labelCuenta} #${cr.id}`;
-                    const saldoActual = this.calcularSaldoCuentaRemunerada(cr, mesActual);
-                    tr.innerHTML = `
-                        <td>${descripcion}</td>
-                        <td><strong>${this.formatCurrency(saldoActual)}</strong></td>
-                        <td>—</td>
-                    `;
-                    this.tbody.appendChild(tr);
-                });
+            // Agregar cuenta remunerada vinculada como fila solo lectura
+            if (crResumen && crResumen.cuenta) {
+                const tr = document.createElement('tr');
+                tr.dataset.auto = 'true';
+                const labelCuenta = this.t('ingresos.cuenta_remunerada', 'Cuenta remunerada');
+                const descripcion = crResumen.cuenta.descripcion || labelCuenta;
+                tr.innerHTML = `
+                    <td>${descripcion}</td>
+                    <td><strong>${this.formatCurrency(crResumen.saldo)}</strong></td>
+                    <td>—</td>
+                `;
+                this.tbody.appendChild(tr);
+            }
 
             // Calcular valor actual de posiciones bolsa en paralelo
             const totalAssets = (await Promise.all(

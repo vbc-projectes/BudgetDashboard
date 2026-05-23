@@ -25,6 +25,7 @@ const MensualService = require('../services/MensualService');
 const HuchaService = require('../services/HuchaService');
 const SubHuchaService = require('../services/SubHuchaService');
 const yahooFinanceService = require('../services/yahooFinanceService');
+const CuentaRemuneradaService = require('../services/CuentaRemuneradaService');
 const {
     getDashboardData,
     getDashboardRealData,
@@ -593,11 +594,17 @@ function registerIpcHandlers() {
     safeHandle('cuenta-remunerada-set-link', async (event, data) => {
         const { id, linked } = data;
         if (!id) throw new Error('ID requerido');
+        await dbRun(db, 'BEGIN');
         await dbRun(db, 'UPDATE cuenta_remunerada SET linked_to_bolsa = 0');
         if (linked) {
             await dbRun(db, 'UPDATE cuenta_remunerada SET linked_to_bolsa = 1 WHERE id = ?', [id]);
         }
+        await dbRun(db, 'COMMIT');
         return { success: true };
+    });
+
+    safeHandle('cr-get-saldo-hoy', async () => {
+        return new CuentaRemuneradaService().getSaldoHoy();
     });
 
     // ============= ASSETS (Yahoo Finance) =============

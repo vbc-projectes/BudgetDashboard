@@ -7,6 +7,7 @@ const express = require('express');
 const db = require('../config/database');
 const { dbRun, dbGet, dbAll } = require('../utils/dbHelpers');
 const { calcularInteresGenerado, generarDescripcionRandom } = require('../utils/calculations');
+const CuentaRemuneradaService = require('../services/CuentaRemuneradaService');
 
 const router = express.Router();
 
@@ -84,19 +85,30 @@ router.post('/delete/cuenta_remunerada', async (req, res, next) => {
     } catch (err) { next(err); }
 });
 
-// Vincular/desvincular cuenta remunerada de la cartera de bolsa
+// Snapshot del saldo de la cuenta remunerada a día de hoy
+router.get('/cuenta-remunerada/saldo-hoy', async (req, res, next) => {
+    try {
+        const service = new CuentaRemuneradaService();
+        res.json(await service.getSaldoHoy());
+    } catch (err) { next(err); }
+});
+
+// Vincular/desvincular cuenta remunerada de la cartera de bolsa (transacción atómica)
 router.post('/cuenta_remunerada/set-link', async (req, res, next) => {
     try {
         const { id, linked } = req.body;
         if (!id) return res.status(400).json({ error: 'ID requerido' });
-        // Desmarcar todas las cuentas
+        await dbRun(db, 'BEGIN');
         await dbRun(db, 'UPDATE cuenta_remunerada SET linked_to_bolsa = 0');
-        // Si se pide vincular (linked=1), marcar la seleccionada
         if (linked) {
             await dbRun(db, 'UPDATE cuenta_remunerada SET linked_to_bolsa = 1 WHERE id = ?', [id]);
         }
+        await dbRun(db, 'COMMIT');
         res.json({ success: true });
-    } catch (err) { next(err); }
+    } catch (err) {
+        await dbRun(db, 'ROLLBACK').catch(() => {});
+        next(err);
+    }
 });
 
 module.exports = router;
