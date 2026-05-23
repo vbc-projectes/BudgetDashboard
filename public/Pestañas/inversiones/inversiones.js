@@ -1061,19 +1061,15 @@ async function _renderResumen() {
 // ── Cuenta Remunerada vinculada a bolsa ──────────────────────────────
 
 async function loadCuentaRemuneradaTab() {
-    let data, cuentas;
+    let data;
     try {
-        const [r1, r2] = await Promise.all([
-            fetch('/bolsa/cuenta-remunerada/saldo-diario'),
-            fetch('/cuenta_remunerada')
-        ]);
+        const r1 = await fetch('/bolsa/cuenta-remunerada/saldo-diario');
         if (!r1.ok) {
             const errData = await r1.json().catch(() => ({}));
             console.error('[CuentaRemunerada] saldo-diario error:', errData);
             window.showToast?.('Error al cargar datos de cuenta remunerada: ' + (errData.error || r1.status), 'error');
         }
-        data   = r1.ok ? await r1.json() : null;
-        cuentas = r2.ok ? await r2.json() : [];
+        data = r1.ok ? await r1.json() : null;
     } catch (err) {
         window.showToast?.('Error al cargar cuenta remunerada: ' + err.message, 'error');
         return;
@@ -1083,7 +1079,13 @@ async function loadCuentaRemuneradaTab() {
     // KPIs
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     if (data && data.cuenta) {
-        set('invCRSaldo',       _fmt(data.saldoActual));
+        // Saldo disponible = último punto de la serie hasta hoy (igual que el gráfico)
+        const _todayStr = new Date().toISOString().slice(0, 10);
+        const _serieHoy = (data.saldoSeries || []).filter(p => p.fecha <= _todayStr);
+        const _saldoDisp = _serieHoy.length > 0
+            ? _serieHoy[_serieHoy.length - 1].saldo
+            : (data.saldoActual || 0);
+        set('invCRSaldo',       _fmt(_saldoDisp));
         set('invCRInvertido',   _fmt(data.saldoInvertido));
         set('invCRInteresBruto',_fmt(data.interesAcumuladoBruto));
         set('invCRInteresNeto', _fmt(data.interesAcumuladoNeto));
@@ -1094,11 +1096,9 @@ async function loadCuentaRemuneradaTab() {
     }
 
     try { _renderCRChart(data); } catch(e) { console.error('Error rendering CR chart:', e); }
-    try { _renderCRTable(cuentas); } catch(e) { console.error('Error rendering CR table:', e); }
-    await _loadCRCategorias();
 
     // Debug: log what was received
-    console.log('[CuentaRemunerada] data:', data ? `cuenta=${data.cuenta?.descripcion}, series=${data.saldoSeries?.length}` : 'null', '| cuentas:', Array.isArray(cuentas) ? cuentas.length : cuentas);
+    console.log('[CuentaRemunerada] data:', data ? `cuenta=${data.cuenta?.descripcion}, series=${data.saldoSeries?.length}` : 'null');
 }
 
 function _renderCRChart(data) {
@@ -1129,7 +1129,8 @@ function _renderCRChart(data) {
 
     if (_inv.chartCR) { try { _inv.chartCR.destroy(); } catch (_) {} _inv.chartCR = null; }
 
-    const series = data.saldoSeries;
+    const today = new Date().toISOString().slice(0, 10);
+    const series = data.saldoSeries.filter(p => p.fecha <= today);
     // Reducir puntos: mostrar máx 400 puntos (toma cada N días)
     const step = Math.max(1, Math.floor(series.length / 400));
     const reduced = series.filter((_, i) => i % step === 0 || i === series.length - 1);
@@ -1193,158 +1194,6 @@ function _renderCRChart(data) {
     // Force resize after a short delay to handle cases where canvas dimensions
     // weren't fully computed at chart-creation time
     setTimeout(() => { if (_inv.chartCR) try { _inv.chartCR.resize(); } catch (_) {} }, 50);
-}
-
-function _renderCRTable(cuentas) {
-    const tbody = document.getElementById('tbodyCRInv');
-    if (!tbody) return;
-    if (!cuentas || !cuentas.length) {
-        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">No hay cuentas remuneradas. Añade una arriba.</td></tr>';
-        return;
-    }
-    tbody.innerHTML = cuentas.map(c => {
-        const linkedBadge = c.linked_to_bolsa
-            ? '<span style="color:#6366f1;font-weight:600;" title="Vinculada">✓</span>'
-            : '<span style="color:#ccc;">—</span>';
-        return `<tr data-id="${c.id}">
-            <td>${c.desde || '—'}</td>
-            <td>${c.hasta || 'Activa'}</td>
-            <td>${c.descripcion || '—'}</td>
-            <td style="text-align:right;">${_fmt(c.monto)}</td>
-            <td style="text-align:right;">${c.aportacion_mensual ? _fmt(c.aportacion_mensual) : '—'}</td>
-            <td style="text-align:right;">${c.interes ? c.interes + ' %' : '—'}</td>
-            <td style="text-align:right;">${c.retencion ? c.retencion + ' %' : '—'}</td>
-            <td>${c.categoria || '—'}</td>
-            <td style="text-align:center;">${linkedBadge}</td>
-            <td>
-                <button class="btn-icon btn-cr-edit" data-id="${c.id}" title="Editar" style="margin-right:4px;"><i class="fas fa-edit"></i></button>
-                <button class="btn-icon btn-cr-del"  data-id="${c.id}" title="Eliminar"><i class="fas fa-trash"></i></button>
-            </td>
-        </tr>`;
-    }).join('');
-
-    // Delegate events
-    tbody.onclick = e => {
-        const editBtn = e.target.closest('.btn-cr-edit');
-        if (editBtn) { _editCR(editBtn.dataset.id, cuentas); return; }
-        const delBtn  = e.target.closest('.btn-cr-del');
-        if (delBtn)  { _deleteCR(delBtn.dataset.id); }
-    };
-}
-
-async function _loadCRCategorias() {
-    const sel = document.getElementById('categoriaCRInv');
-    if (!sel || sel.options.length > 1) return; // ya cargado
-    try {
-        const r = await fetch('/categorias');
-        if (!r.ok) return;
-        const data = await r.json();
-        const ingresos = Array.isArray(data) ? data.filter(c => c.tipo === 'ingreso') : (data.ingresos || []);
-        ingresos.forEach(c => {
-            const opt = document.createElement('option');
-            opt.value = c.id; opt.textContent = c.nombre;
-            sel.appendChild(opt);
-        });
-    } catch (_) {}
-}
-
-async function _addCREntry() {
-    const desde      = document.getElementById('invCRDesde')?.value;
-    const hasta      = document.getElementById('invCRHasta')?.value || null;
-    const descripcion= document.getElementById('invCRDescripcion')?.value.trim() || '';
-    const monto      = parseFloat(document.getElementById('invCRMonto')?.value);
-    const aportacion = parseFloat(document.getElementById('invCRAportacion')?.value) || null;
-    const interes    = parseFloat(document.getElementById('invCRInteres')?.value) || null;
-    const retencion  = parseFloat(document.getElementById('invCRRetencion')?.value) || 0;
-    const catId      = document.getElementById('categoriaCRInv')?.value || null;
-    const linked     = document.getElementById('invCRLinkedBolsa')?.checked ? 1 : 0;
-
-    if (!desde || isNaN(monto)) {
-        window.showToast?.('Fecha inicio y monto son obligatorios.', 'warning');
-        return;
-    }
-    try {
-        const res = await fetch('/add/cuenta_remunerada', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ desde, hasta, descripcion, monto, aportacion_mensual: aportacion, interes, retencion, categoria_id: catId, linked_to_bolsa: linked })
-        });
-        if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error'); }
-        // Clear form
-        ['invCRDesde','invCRHasta','invCRDescripcion','invCRMonto','invCRAportacion','invCRInteres','invCRRetencion']
-            .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-        const chk = document.getElementById('invCRLinkedBolsa');
-        if (chk) chk.checked = false;
-        _inv.crData = null; // invalidar cache
-        await loadCuentaRemuneradaTab();
-        window.showToast?.('Cuenta remunerada añadida', 'success');
-    } catch (err) { window.showToast?.('Error: ' + err.message, 'error'); }
-}
-
-function _editCR(id, cuentas) {
-    const c = cuentas.find(x => String(x.id) === String(id));
-    if (!c) return;
-    const tr = document.querySelector(`#tbodyCRInv tr[data-id="${id}"]`);
-    if (!tr) return;
-
-    tr.innerHTML = `
-        <td><input type="month" value="${c.desde||''}" id="crEditDesde" style="width:120px;"></td>
-        <td><input type="month" value="${c.hasta||''}" id="crEditHasta" style="width:120px;"></td>
-        <td><input type="text"  value="${(c.descripcion||'').replace(/"/g,'&quot;')}" id="crEditDesc" style="width:120px;"></td>
-        <td><input type="number" value="${c.monto||0}" id="crEditMonto" step="0.01" style="width:90px;"></td>
-        <td><input type="number" value="${c.aportacion_mensual||''}" id="crEditAport" step="0.01" style="width:90px;"></td>
-        <td><input type="number" value="${c.interes||''}" id="crEditInteres" step="0.01" style="width:70px;"></td>
-        <td><input type="number" value="${c.retencion||0}" id="crEditRet" step="0.01" style="width:70px;"></td>
-        <td><input type="text"  value="${(c.categoria||'').replace(/"/g,'&quot;')}" id="crEditCat" style="width:100px;"></td>
-        <td style="text-align:center;"><input type="checkbox" id="crEditLinked" ${c.linked_to_bolsa ? 'checked' : ''}></td>
-        <td>
-            <button class="btn-icon btn-cr-save" data-id="${id}" title="Guardar" style="margin-right:4px;"><i class="fas fa-check"></i></button>
-            <button class="btn-icon btn-cr-cancel" title="Cancelar"><i class="fas fa-times"></i></button>
-        </td>`;
-
-    tr.querySelector('.btn-cr-save').onclick = () => _saveCR(id);
-    tr.querySelector('.btn-cr-cancel').onclick = () => loadCuentaRemuneradaTab();
-}
-
-async function _saveCR(id) {
-    const data = {
-        id,
-        desde:             document.getElementById('crEditDesde')?.value,
-        hasta:             document.getElementById('crEditHasta')?.value || null,
-        descripcion:       document.getElementById('crEditDesc')?.value.trim(),
-        monto:             parseFloat(document.getElementById('crEditMonto')?.value) || 0,
-        aportacion_mensual:parseFloat(document.getElementById('crEditAport')?.value) || null,
-        interes:           parseFloat(document.getElementById('crEditInteres')?.value) || null,
-        retencion:         parseFloat(document.getElementById('crEditRet')?.value) || 0,
-        categoria:         document.getElementById('crEditCat')?.value.trim() || null,
-        linked_to_bolsa:   document.getElementById('crEditLinked')?.checked ? 1 : 0
-    };
-    try {
-        const res = await fetch('/update/cuenta_remunerada', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error'); }
-        _inv.crData = null;
-        await loadCuentaRemuneradaTab();
-        window.showToast?.('Cuenta remunerada actualizada', 'success');
-    } catch (err) { window.showToast?.('Error: ' + err.message, 'error'); }
-}
-
-async function _deleteCR(id) {
-    if (!confirm('¿Eliminar esta cuenta remunerada?')) return;
-    try {
-        const res = await fetch('/delete/cuenta_remunerada', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id })
-        });
-        if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error'); }
-        _inv.crData = null;
-        await loadCuentaRemuneradaTab();
-        window.showToast?.('Cuenta remunerada eliminada', 'success');
-    } catch (err) { window.showToast?.('Error: ' + err.message, 'error'); }
 }
 
 // ── Entry point — se llama en cada apertura de la pestaña ────────────
@@ -1424,8 +1273,6 @@ async function initInversiones() {
     // ── Refresh resumen
     document.getElementById('btnRefreshResumen')?.addEventListener('click', _renderResumen);
 
-    // ── Cuenta Remunerada
-    document.getElementById('btnAgregarCRInv')?.addEventListener('click', _addCREntry);
 }
 
 if (typeof module !== 'undefined') module.exports = { initInversiones };

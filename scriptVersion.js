@@ -253,7 +253,56 @@ function createGithubRelease(tag, isPrerelease) {
 const DOCKER_USER = 'cpachecoperello';
 const DOCKER_IMAGE = `${DOCKER_USER}/dashboardeconomic`;
 
+function isDockerRunning() {
+  const result = spawnSync('docker', ['info'], { stdio: 'ignore', shell: false });
+  return result.status === 0;
+}
+
+function ensureDockerRunning() {
+  if (isDockerRunning()) return;
+
+  console.log('\nDocker no está activo. Arrancando Docker Desktop...');
+
+  const candidates = [
+    'C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe',
+    process.env.LOCALAPPDATA
+      ? `${process.env.LOCALAPPDATA}\\Docker\\Docker Desktop.exe`
+      : null,
+  ].filter(Boolean);
+
+  let launched = false;
+  for (const exe of candidates) {
+    if (fs.existsSync(exe)) {
+      spawnSync('cmd.exe', ['/d', '/s', '/c', 'start', '', exe], { shell: false });
+      launched = true;
+      break;
+    }
+  }
+
+  if (!launched) {
+    console.error('No se encontró Docker Desktop. Instálalo o arráncalo manualmente y vuelve a intentarlo.');
+    process.exit(1);
+  }
+
+  const timeout = 120_000;
+  const interval = 5_000;
+  const started = Date.now();
+  process.stdout.write('Esperando a que Docker esté listo');
+  while (Date.now() - started < timeout) {
+    sleep(interval);
+    process.stdout.write('.');
+    if (isDockerRunning()) {
+      console.log(' listo!\n');
+      return;
+    }
+  }
+  console.log('');
+  console.error('Timeout esperando a Docker. Arráncalo manualmente y vuelve a intentarlo.');
+  process.exit(1);
+}
+
 function buildAndPushDocker(version, tagSuffix) {
+  ensureDockerRunning();
   const tagVersioned = `${DOCKER_IMAGE}:${version}${tagSuffix}`;
   // develop branch -> 'develop' floating tag; main -> 'latest'
   const tagFloating = tagSuffix ? `${DOCKER_IMAGE}:develop` : `${DOCKER_IMAGE}:latest`;

@@ -404,54 +404,6 @@
       </p>
     </div>
 
-    <!-- Tabla CRUD de cuentas remuneradas -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-      <h3 style="margin:0;font-size:15px;">Cuentas remuneradas</h3>
-    </div>
-    <div class="table-container">
-      <table id="tablaCRInv" style="font-size:13px;">
-        <thead>
-          <tr>
-            <th>Desde</th>
-            <th>Hasta</th>
-            <th>Descripción</th>
-            <th>Saldo inicial (€)</th>
-            <th>Aportación mensual (€)</th>
-            <th>Interés (%)</th>
-            <th>Retención (%)</th>
-            <th>Categoría</th>
-            <th title="Vinculada a bolsa">Vinculada</th>
-            <th>Acciones</th>
-          </tr>
-          <tr id="invCRAddRow">
-            <td><input type="month" id="invCRDesde" style="width:130px;"></td>
-            <td><input type="month" id="invCRHasta" style="width:130px;"></td>
-            <td><input type="text" id="invCRDescripcion" placeholder="Descripción" style="width:130px;"></td>
-            <td><input type="number" id="invCRMonto" placeholder="0.00" min="0" step="0.01" style="width:100px;"></td>
-            <td><input type="number" id="invCRAportacion" placeholder="0.00" min="0" step="0.01" style="width:100px;"></td>
-            <td><input type="number" id="invCRInteres" placeholder="0.00" min="0" step="0.01" style="width:80px;"></td>
-            <td><input type="number" id="invCRRetencion" placeholder="19" min="0" step="0.01" style="width:80px;"></td>
-            <td>
-              <select id="categoriaCRInv" style="width:120px;">
-                <option value="">— Categoría —</option>
-              </select>
-            </td>
-            <td style="text-align:center;">
-              <input type="checkbox" id="invCRLinkedBolsa" title="Vincular esta cuenta a bolsa">
-            </td>
-            <td>
-              <button id="btnAgregarCRInv" style="white-space:nowrap;">
-                <i class="fas fa-plus"></i> Añadir
-              </button>
-            </td>
-          </tr>
-        </thead>
-        <tbody id="tbodyCRInv">
-          <tr><td colspan="10" class="text-center text-muted">Cargando…</td></tr>
-        </tbody>
-      </table>
-    </div>
-
   </div>
 
 </div>

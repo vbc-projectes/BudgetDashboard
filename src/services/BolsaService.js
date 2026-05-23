@@ -498,7 +498,8 @@ class BolsaService {
         }
 
         // Rango de fechas: desde CR.desde hasta CR.hasta o hoy
-        const hoy = new Date().toISOString().slice(0, 10);
+        const _now = new Date();
+        const hoy = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`;
         // Support YYYY-MM (month picker) or YYYY-MM-DD (full date)
         let fechaInicio;
         if (cuenta.desde) {
@@ -522,7 +523,7 @@ class BolsaService {
         const movByDate = {};
         let totalInvertido = 0;
         for (const op of ops) {
-            const f = op.fecha;
+            const f = (op.fecha || '').slice(0, 10); // normalizar a YYYY-MM-DD
             if (!movByDate[f]) movByDate[f] = 0;
             const importe = parseFloat(op.cantidad) * parseFloat(op.precio_unitario) + parseFloat(op.comision || 0);
             if (op.tipo === 'compra') {
@@ -546,6 +547,12 @@ class BolsaService {
         let   saldo        = parseFloat(cuenta.monto) || 0;
         let   interesAcum  = 0;
 
+        // Aplicar movimientos de bolsa anteriores a fechaInicio al saldo inicial
+        // (operaciones que ocurrieron antes de que se creara el registro de la cuenta)
+        for (const [fecha, mov] of Object.entries(movByDate)) {
+            if (fecha < fechaInicio) saldo += mov;
+        }
+
         let current = new Date(fechaInicio + 'T00:00:00');
         const end   = new Date(fechaFin    + 'T00:00:00');
         if (end < current) {
@@ -558,8 +565,12 @@ class BolsaService {
 
         let prevMonth = current.getMonth();
 
+        // Helper: fecha local en formato YYYY-MM-DD (evita desfase UTC en servidores con TZ local)
+        const toLocalDateStr = d =>
+            `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
         while (current <= endEffective) {
-            const fechaStr = current.toISOString().slice(0, 10);
+            const fechaStr = toLocalDateStr(current);
 
             // 1º de mes (después del mes inicial): aportación mensual
             const curMonth = current.getMonth();
