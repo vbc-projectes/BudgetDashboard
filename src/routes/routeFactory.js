@@ -48,7 +48,7 @@ function createEntityRoutes(entityName, puntualService, mensualService) {
     router.post(`/add/${entityName}_puntual`, async (req, res) => {
         try {
             await puntualService.add(req.body);
-            res.sendStatus(200);
+            res.json({ success: true });
         } catch (err) {
             res.status(400).json({ error: err.message });
         }

@@ -404,9 +404,10 @@ async function getCategoriasPeriodo(desde, hasta) {
         JOIN categorias c ON gm.categoria_id = c.id
     `);
 
+    // Generar array de meses una sola vez para toda la iteración
+    const mesesGastos = generarArrayMeses(desde, hasta, { monto: 0 });
     gastosM.forEach(gm => {
-        const meses = generarArrayMeses(desde, hasta, { monto: 0 });
-        meses.forEach(m => {
+        mesesGastos.forEach(m => {
             if (esMensualActivo(m.mes, hastaDate, gm.desde, gm.hasta)) {
                 const targetDate = new Date(`${m.mes}-01`);
                 const montoAdj = calcularMontoIpc(gm.monto, gm.ipc_porcentaje, gm.desde, targetDate);
@@ -432,9 +433,10 @@ async function getCategoriasPeriodo(desde, hasta) {
     `);
 
     const ingresosMAgrupados = {};
+    // Generar array de meses una sola vez para toda la iteración
+    const mesesIngresos = generarArrayMeses(desde, hasta, { monto: 0 });
     ingresosM.forEach(im => {
-        const meses = generarArrayMeses(desde, hasta, { monto: 0 });
-        meses.forEach(m => {
+        mesesIngresos.forEach(m => {
             if (esMensualActivo(m.mes, hastaDate, im.desde, im.hasta)) {
                 if (!ingresosMAgrupados[im.categoria]) {
                     ingresosMAgrupados[im.categoria] = 0;

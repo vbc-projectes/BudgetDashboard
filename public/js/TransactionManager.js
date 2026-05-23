@@ -18,6 +18,19 @@ class TransactionManager {
     }
 
     // ===== FORMATEO Y PARSING =====
+
+    /** Escapa HTML para evitar XSS al insertar texto de usuario en innerHTML */
+    escapeHtml(text) {
+        if (text === null || text === undefined) return '';
+        const str = String(text);
+        return str
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     formatCurrency(monto, options = {}) {
         if (typeof window.formatCurrency === 'function') {
             return window.formatCurrency(monto, options);
@@ -192,6 +205,9 @@ class TransactionManager {
             content = Number.isNaN(num) ? '—' : `${num}%`;
         } else if (content === null || content === undefined) {
             content = (column === 'bruto' || column === 'aportacion_mensual' || column === 'interes_generado' || column === 'monto_ajustado' || column === 'ipc_porcentaje' || column === 'retencion') ? '—' : '';
+        } else {
+            // Texto plano de usuario: escapar para prevenir XSS
+            content = this.escapeHtml(content);
         }
 
         return `<td class="editable" data-field="${column}">${content}</td>`;

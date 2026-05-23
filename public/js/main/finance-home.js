@@ -299,7 +299,8 @@ function renderInicioEvolucion(ahorrosMes = [], ahorrosPrev = []) {
     const ahorrosGradient = makeGradient(primaryColor, 0.3, 0.03);
 
     if (inicioEvolucionChart) {
-        inicioEvolucionChart.destroy();
+        try { inicioEvolucionChart.destroy(); } catch (_) {}
+        inicioEvolucionChart = null;
     }
 
     inicioEvolucionChart = new Chart(canvas, {

@@ -4,13 +4,9 @@
  * de modo que las compras/ventas de acciones afectan su saldo calculado.
  */
 
-async function up(db, dbRun) {
+async function up(db, dbRun, _dbGet, dbAll) {
     // SQLite no soporta IF NOT EXISTS en ALTER TABLE, así que comprobamos primero
-    const info = await new Promise((resolve, reject) => {
-        db.all('PRAGMA table_info(cuenta_remunerada)', (err, rows) => {
-            if (err) reject(err); else resolve(rows);
-        });
-    });
+    const info = await dbAll(db, 'PRAGMA table_info(cuenta_remunerada)');
 
     const hasCol = info.some(r => r.name === 'linked_to_bolsa');
     if (!hasCol) {

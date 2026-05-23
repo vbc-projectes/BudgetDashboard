@@ -121,10 +121,17 @@ class SubHuchaService {
             this.getAllPuntuales()
         ]);
 
+        // Indexar puntuales por sub_hucha_id para evitar O(n²)
+        const puntualPorHucha = new Map();
+        for (const p of puntuales) {
+            const lista = puntualPorHucha.get(p.sub_hucha_id);
+            if (lista) lista.push(p);
+            else puntualPorHucha.set(p.sub_hucha_id, [p]);
+        }
+
         let total = 0;
         for (const h of huchas) {
-            const puntH = puntuales.filter(p => p.sub_hucha_id === h.id);
-            total += this.calcularSaldo(h, puntH, mesReferencia);
+            total += this.calcularSaldo(h, puntualPorHucha.get(h.id) || [], mesReferencia);
         }
         return total;
     }
