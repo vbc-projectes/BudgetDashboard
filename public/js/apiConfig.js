@@ -243,6 +243,22 @@ window.API = {
         if (method === 'GET' && (m = basePath.match(/^\/bolsa\/ticker-history\/(.+)$/)))
             return api.bolsaGetTickerHistory(decodeURIComponent(m[1]));
 
+        // CR aportaciones variables
+        if (method === 'GET'    && (m = basePath.match(/^\/cuenta-remunerada\/(\d+)\/aportaciones$/)))
+            return api.getCRAportaciones({ id: Number(m[1]) });
+        if (method === 'POST'   && (m = basePath.match(/^\/cuenta-remunerada\/(\d+)\/aportaciones$/)))
+            return api.addCRAportacion({ id: Number(m[1]), ...body });
+        if (method === 'DELETE' && (m = basePath.match(/^\/cuenta-remunerada\/aportaciones\/(\d+)$/)))
+            return api.deleteCRAportacion({ id: Number(m[1]) });
+
+        // CR ajustes manuales de saldo
+        if (method === 'GET'    && (m = basePath.match(/^\/cuenta-remunerada\/(\d+)\/ajustes$/)))
+            return api.getCRAjustes({ id: Number(m[1]) });
+        if (method === 'POST'   && (m = basePath.match(/^\/cuenta-remunerada\/(\d+)\/ajustes$/)))
+            return api.addCRAjuste({ id: Number(m[1]), ...body });
+        if (method === 'DELETE' && (m = basePath.match(/^\/cuenta-remunerada\/ajustes\/(\d+)$/)))
+            return api.deleteCRAjuste({ id: Number(m[1]) });
+
         throw new Error(`Ruta no implementada: ${method} ${url}`);
     }
 };

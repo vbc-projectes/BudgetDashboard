@@ -93,6 +93,54 @@ router.get('/cuenta-remunerada/saldo-hoy', async (req, res, next) => {
     } catch (err) { next(err); }
 });
 
+// ── Aportaciones variables ──────────────────────────────────────────────────
+router.get('/cuenta-remunerada/:id/aportaciones', async (req, res, next) => {
+    try {
+        const rows = await dbAll(db, `SELECT * FROM cuenta_remunerada_aportaciones WHERE cuenta_id = ? ORDER BY desde ASC`, [req.params.id]);
+        res.json(rows || []);
+    } catch (err) { next(err); }
+});
+
+router.post('/cuenta-remunerada/:id/aportaciones', async (req, res, next) => {
+    try {
+        const { desde, cantidad } = req.body;
+        if (!desde || cantidad === undefined) return res.status(400).json({ error: 'desde y cantidad son requeridos' });
+        await dbRun(db, `INSERT INTO cuenta_remunerada_aportaciones (cuenta_id, desde, cantidad) VALUES (?, ?, ?)`, [req.params.id, desde, cantidad]);
+        res.json({ success: true });
+    } catch (err) { next(err); }
+});
+
+router.delete('/cuenta-remunerada/aportaciones/:aportacionId', async (req, res, next) => {
+    try {
+        await dbRun(db, `DELETE FROM cuenta_remunerada_aportaciones WHERE id = ?`, [req.params.aportacionId]);
+        res.json({ success: true });
+    } catch (err) { next(err); }
+});
+
+// ── Ajustes manuales de saldo ───────────────────────────────────────────────
+router.get('/cuenta-remunerada/:id/ajustes', async (req, res, next) => {
+    try {
+        const rows = await dbAll(db, `SELECT * FROM cuenta_remunerada_ajustes WHERE cuenta_id = ? ORDER BY fecha ASC`, [req.params.id]);
+        res.json(rows || []);
+    } catch (err) { next(err); }
+});
+
+router.post('/cuenta-remunerada/:id/ajustes', async (req, res, next) => {
+    try {
+        const { fecha, saldo, descripcion } = req.body;
+        if (!fecha || saldo === undefined) return res.status(400).json({ error: 'fecha y saldo son requeridos' });
+        await dbRun(db, `INSERT INTO cuenta_remunerada_ajustes (cuenta_id, fecha, saldo, descripcion) VALUES (?, ?, ?, ?)`, [req.params.id, fecha, saldo, descripcion || null]);
+        res.json({ success: true });
+    } catch (err) { next(err); }
+});
+
+router.delete('/cuenta-remunerada/ajustes/:ajusteId', async (req, res, next) => {
+    try {
+        await dbRun(db, `DELETE FROM cuenta_remunerada_ajustes WHERE id = ?`, [req.params.ajusteId]);
+        res.json({ success: true });
+    } catch (err) { next(err); }
+});
+
 // Vincular/desvincular cuenta remunerada de la cartera de bolsa (transacción atómica)
 router.post('/cuenta_remunerada/set-link', async (req, res, next) => {
     try {

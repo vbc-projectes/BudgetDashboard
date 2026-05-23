@@ -13,6 +13,7 @@ class TransactionManager {
         this.showOldFlag = config.showOldFlag || 'showOldItems'; // flag para filtrar antiguos
         this.i18nPrefix = config.i18nPrefix || 'formularios'; // prefijo para traducciones
         this.customColumns = config.customColumns || {}; // columnas personalizadas por tipo
+        this.extraActions  = config.extraActions  || {}; // botones extra por tipo: { cuentaRemunerada: [{cls, icon, title}] }
         this.categoryType = config.categoryType; // 'gastos' o 'ingresos'
     }
 
@@ -149,7 +150,7 @@ class TransactionManager {
 
         const columns = this.getColumns(type);
         const cells = columns.map(col => this.createCell(item, col)).join('');
-        const actions = this.createActionButtons(item);
+        const actions = this.createActionButtons(item, type);
 
         tr.innerHTML = `${cells}${actions}`;
         return tr;
@@ -196,12 +197,18 @@ class TransactionManager {
         return `<td class="editable" data-field="${column}">${content}</td>`;
     }
 
-    createActionButtons(item) {
-        const editTitle = this.t('formularios.editar', 'Editar');
+    createActionButtons(item, type = '') {
+        const editTitle   = this.t('formularios.editar',   'Editar');
         const deleteTitle = this.t('formularios.eliminar', 'Eliminar');
-        
+
+        const extras = (this.extraActions[type] || []).map(a =>
+            `<button class="${a.cls}" data-id="${item.id}" title="${a.title}" style="margin-right:4px;">`+
+            `<i class="fas ${a.icon}"></i></button>`
+        ).join('');
+
         return `
             <td>
+                ${extras}
                 <button class="editBtn btn-editar" title="${editTitle}" style="margin-right:8px;">
                     <i class="fas fa-edit"></i>
                 </button>

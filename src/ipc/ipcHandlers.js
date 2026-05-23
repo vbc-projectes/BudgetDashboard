@@ -607,6 +607,34 @@ function registerIpcHandlers() {
         return new CuentaRemuneradaService().getSaldoHoy();
     });
 
+    // ── CR aportaciones variables ────────────────────────────────────────────
+    safeHandle('cr-get-aportaciones', async (event, data) => {
+        return await dbAll(db, `SELECT * FROM cuenta_remunerada_aportaciones WHERE cuenta_id = ? ORDER BY desde ASC`, [data.id]);
+    });
+    safeHandle('cr-add-aportacion', async (event, data) => {
+        const { id, desde, cantidad } = data;
+        await dbRun(db, `INSERT INTO cuenta_remunerada_aportaciones (cuenta_id, desde, cantidad) VALUES (?, ?, ?)`, [id, desde, cantidad]);
+        return { success: true };
+    });
+    safeHandle('cr-delete-aportacion', async (event, data) => {
+        await dbRun(db, `DELETE FROM cuenta_remunerada_aportaciones WHERE id = ?`, [data.id]);
+        return { success: true };
+    });
+
+    // ── CR ajustes manuales de saldo ─────────────────────────────────────────
+    safeHandle('cr-get-ajustes', async (event, data) => {
+        return await dbAll(db, `SELECT * FROM cuenta_remunerada_ajustes WHERE cuenta_id = ? ORDER BY fecha ASC`, [data.id]);
+    });
+    safeHandle('cr-add-ajuste', async (event, data) => {
+        const { id, fecha, saldo, descripcion } = data;
+        await dbRun(db, `INSERT INTO cuenta_remunerada_ajustes (cuenta_id, fecha, saldo, descripcion) VALUES (?, ?, ?, ?)`, [id, fecha, saldo, descripcion || null]);
+        return { success: true };
+    });
+    safeHandle('cr-delete-ajuste', async (event, data) => {
+        await dbRun(db, `DELETE FROM cuenta_remunerada_ajustes WHERE id = ?`, [data.id]);
+        return { success: true };
+    });
+
     // ============= ASSETS (Yahoo Finance) =============
     
     safeHandle('get-assets', async () => {

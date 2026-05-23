@@ -34,6 +34,9 @@ function cargarIngresosForm() {
             mensual: ['desde', 'hasta', 'descripcion', 'monto', 'bruto', 'categoria'],
             cuentaRemunerada: ['desde', 'hasta', 'descripcion', 'monto', 'aportacion_mensual', 'interes', 'retencion', 'interes_generado', 'interes_neto', 'categoria', 'linked_to_bolsa']
         },
+        extraActions: {
+            cuentaRemunerada: [{ cls: 'btn-cr-config', icon: 'fa-cog', title: 'Configurar aportaciones y ajustes' }]
+        },
         showOldFlag: 'showOldIngresos'
     });
 
@@ -237,6 +240,162 @@ function cargarIngresosForm() {
         } catch (err) {
             window.showToast?.('Error: ' + err.message, 'error');
         }
+    });
+
+    // ===== CONFIGURAR CUENTA REMUNERADA (⚙️) =====
+    // Delegación en tbody para el botón .btn-cr-config
+    document.querySelector('#tablaCuentaRemunerada tbody')?.addEventListener('click', e => {
+        const btn = e.target.closest('.btn-cr-config');
+        if (!btn) return;
+        abrirModalCRConfig(Number(btn.dataset.id));
+    });
+
+    // ── Modal CR Config: estado ─────────────────────────────────────────────
+    let _crConfigId = null;
+
+    const modalCRConfig = document.getElementById('modalCRConfig');
+    document.getElementById('modalCRConfigClose')?.addEventListener('click', () => {
+        modalCRConfig.style.display = 'none';
+        _crConfigId = null;
+    });
+    modalCRConfig?.addEventListener('click', e => {
+        if (e.target === modalCRConfig) { modalCRConfig.style.display = 'none'; _crConfigId = null; }
+    });
+
+    // Formatea moneda sin conversión (usar la utilidad global si está disponible)
+    function _fmtCR(v) {
+        if (typeof tabUiCommonUtils?.formatCurrencyNoConvert === 'function') return tabUiCommonUtils.formatCurrencyNoConvert(v);
+        return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v);
+    }
+
+    // Renderiza la tabla de aportaciones dentro del modal
+    function renderCRAportaciones(lista) {
+        const tbody = document.getElementById('tbodyCRAportaciones');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        if (!lista.length) {
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#aaa;padding:10px;font-size:12px;">Sin cambios registrados</td></tr>';
+            return;
+        }
+        lista.forEach(ap => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="padding:4px 8px;">${ap.desde}</td>
+                <td style="padding:4px 8px;text-align:right;"><strong>${_fmtCR(ap.cantidad)}</strong></td>
+                <td style="padding:4px 8px;text-align:center;">
+                    <button data-id="${ap.id}" class="btn-del-aportacion btn-eliminar" title="Eliminar" style="padding:2px 7px;">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // Renderiza la tabla de ajustes dentro del modal
+    function renderCRAjustes(lista) {
+        const tbody = document.getElementById('tbodyCRAjustes');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        if (!lista.length) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#aaa;padding:10px;font-size:12px;">Sin ajustes registrados</td></tr>';
+            return;
+        }
+        lista.forEach(aj => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="padding:4px 8px;">${aj.fecha}</td>
+                <td style="padding:4px 8px;text-align:right;"><strong>${_fmtCR(aj.saldo)}</strong></td>
+                <td style="padding:4px 8px;color:#666;">${aj.descripcion || ''}</td>
+                <td style="padding:4px 8px;text-align:center;">
+                    <button data-id="${aj.id}" class="btn-del-ajuste btn-eliminar" title="Eliminar" style="padding:2px 7px;">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // Carga y muestra el modal para una CR concreta
+    async function abrirModalCRConfig(cuentaId) {
+        _crConfigId = cuentaId;
+        // Cargar ambas listas en paralelo
+        const [resAp, resAj] = await Promise.all([
+            fetch(`/cuenta-remunerada/${cuentaId}/aportaciones`),
+            fetch(`/cuenta-remunerada/${cuentaId}/ajustes`)
+        ]);
+        const aportaciones = resAp.ok ? await resAp.json() : [];
+        const ajustes      = resAj.ok ? await resAj.json() : [];
+        renderCRAportaciones(aportaciones);
+        renderCRAjustes(ajustes);
+        // Limpiar inputs
+        document.getElementById('crAportDesde').value    = '';
+        document.getElementById('crAportCantidad').value = '';
+        document.getElementById('crAjusteFecha').value   = '';
+        document.getElementById('crAjusteSaldo').value   = '';
+        document.getElementById('crAjusteDesc').value    = '';
+        modalCRConfig.style.display = 'flex';
+    }
+
+    // Añadir aportación variable
+    document.getElementById('btnAddCRAportacion')?.addEventListener('click', async () => {
+        if (!_crConfigId) return;
+        const desde    = document.getElementById('crAportDesde').value;
+        const cantidad = parseFloat(document.getElementById('crAportCantidad').value);
+        if (!desde)           return showAlert('Indica la fecha desde la que aplica la nueva aportación (YYYY-MM-DD)');
+        if (isNaN(cantidad))  return showAlert('Indica el importe mensual');
+        const res = await fetch(`/cuenta-remunerada/${_crConfigId}/aportaciones`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ desde, cantidad })
+        });
+        if (!res.ok) return showAlert('Error al guardar la aportación');
+        const lista = await (await fetch(`/cuenta-remunerada/${_crConfigId}/aportaciones`)).json();
+        renderCRAportaciones(lista);
+        document.getElementById('crAportDesde').value    = '';
+        document.getElementById('crAportCantidad').value = '';
+    });
+
+    // Eliminar aportación variable (delegación)
+    document.getElementById('tbodyCRAportaciones')?.addEventListener('click', async e => {
+        const btn = e.target.closest('.btn-del-aportacion');
+        if (!btn || !_crConfigId) return;
+        const confirmed = await showConfirm('¿Eliminar este cambio de aportación?');
+        if (!confirmed) return;
+        await fetch(`/cuenta-remunerada/aportaciones/${btn.dataset.id}`, { method: 'DELETE' });
+        const lista = await (await fetch(`/cuenta-remunerada/${_crConfigId}/aportaciones`)).json();
+        renderCRAportaciones(lista);
+    });
+
+    // Añadir ajuste de saldo
+    document.getElementById('btnAddCRAjuste')?.addEventListener('click', async () => {
+        if (!_crConfigId) return;
+        const fecha       = document.getElementById('crAjusteFecha').value;
+        const saldo       = parseFloat(document.getElementById('crAjusteSaldo').value);
+        const descripcion = document.getElementById('crAjusteDesc').value.trim() || null;
+        if (!fecha)        return showAlert('Indica la fecha del ajuste');
+        if (isNaN(saldo))  return showAlert('Indica el saldo correcto');
+        const res = await fetch(`/cuenta-remunerada/${_crConfigId}/ajustes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fecha, saldo, descripcion })
+        });
+        if (!res.ok) return showAlert('Error al guardar el ajuste');
+        const lista = await (await fetch(`/cuenta-remunerada/${_crConfigId}/ajustes`)).json();
+        renderCRAjustes(lista);
+        document.getElementById('crAjusteFecha').value = '';
+        document.getElementById('crAjusteSaldo').value = '';
+        document.getElementById('crAjusteDesc').value  = '';
+    });
+
+    // Eliminar ajuste de saldo (delegación)
+    document.getElementById('tbodyCRAjustes')?.addEventListener('click', async e => {
+        const btn = e.target.closest('.btn-del-ajuste');
+        if (!btn || !_crConfigId) return;
+        const confirmed = await showConfirm('¿Eliminar este ajuste de saldo?');
+        if (!confirmed) return;
+        await fetch(`/cuenta-remunerada/ajustes/${btn.dataset.id}`, { method: 'DELETE' });
+        const lista = await (await fetch(`/cuenta-remunerada/${_crConfigId}/ajustes`)).json();
+        renderCRAjustes(lista);
     });
 
     // ===== TOGGLE MOSTRAR ANTIGUOS =====

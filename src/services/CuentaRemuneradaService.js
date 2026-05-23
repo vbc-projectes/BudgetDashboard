@@ -93,13 +93,41 @@ class CuentaRemuneradaService {
         // ya reflejando cualquier inversión previa — no se re-aplican ops anteriores.
         let saldo = parseFloat(cuenta.monto) || 0;
 
+        // Aportaciones variables: cambios de aportación mensual desde una fecha
+        const aportaciones = await dbAll(db,
+            `SELECT desde, cantidad FROM cuenta_remunerada_aportaciones WHERE cuenta_id = ? ORDER BY desde ASC`,
+            [cuenta.id]
+        );
+
+        // Ajustes manuales de saldo: indexados por fecha para búsqueda O(1)
+        const ajustesRows = await dbAll(db,
+            `SELECT fecha, saldo FROM cuenta_remunerada_ajustes WHERE cuenta_id = ? ORDER BY fecha ASC`,
+            [cuenta.id]
+        );
+        const ajusteByFecha = new Map(ajustesRows.map(a => [a.fecha.slice(0, 10), parseFloat(a.saldo)]));
+
+        /**
+         * Calcula la aportación efectiva en una fecha dada:
+         * - Si hay aportaciones variables, usa la última cuyo `desde` <= fechaStr.
+         * - Si no hay ninguna aplicable, usa cuenta.aportacion_mensual (valor base).
+         */
+        function aportacionEfectiva(fechaStr) {
+            let valor = parseFloat(cuenta.aportacion_mensual) || 0;
+            for (const ap of aportaciones) {
+                if (ap.desde <= fechaStr) valor = parseFloat(ap.cantidad);
+                else break;
+            }
+            return valor;
+        }
+
         // Límite para saldoHoy: min(hoy, fechaFin)
         const endForHoy    = fechaFin < hoy ? fechaFin : hoy;
         // Límite para la serie: si fullSeries, hasta fechaFin (puede ser futuro); si no, hasta endForHoy
         const endForSeries = fullSeries ? (cuenta.hasta ? fechaFin : hoy) : endForHoy;
 
         const saldoSeries = [];
-        let interesAcum   = 0;
+        let interesAcum    = 0; // acumula toda la serie (puede incluir futuro si hay fechaFin)
+        let interesAcumHoy = 0; // acumula sólo hasta min(hoy, fechaFin) → para los KPIs
         let saldoHoyVal   = null; // se capturará al llegar a endForHoy
 
         let current  = new Date(fechaInicio + 'T00:00:00');
@@ -114,15 +142,21 @@ class CuentaRemuneradaService {
 
             // Aportación mensual: primer día del mes, después del mes inicial
             if (fechaStr > fechaInicio && current.getDate() === 1 && curMonth !== prevMonth) {
-                saldo += parseFloat(cuenta.aportacion_mensual) || 0;
+                saldo += aportacionEfectiva(fechaStr);
             }
             prevMonth = curMonth;
 
             // Movimientos de bolsa en este día
             if (movByDate[fechaStr]) saldo += movByDate[fechaStr];
 
+            // Ajuste manual: sobreescribe el saldo calculado con el valor correcto del usuario
+            if (ajusteByFecha.has(fechaStr)) saldo = ajusteByFecha.get(fechaStr);
+
             // Interés diario acumulado
-            if (saldo > 0) interesAcum += saldo * tasaDiaria;
+            if (saldo > 0) {
+                interesAcum += saldo * tasaDiaria;
+                if (fechaStr <= endForHoy) interesAcumHoy += saldo * tasaDiaria;
+            }
 
             const snapSaldo = parseFloat(saldo.toFixed(2));
             if (fullSeries) saldoSeries.push({ fecha: fechaStr, saldo: snapSaldo });
@@ -136,8 +170,9 @@ class CuentaRemuneradaService {
         // Fallback: si nunca tocamos endForHoy (p.ej. fechaInicio > hoy), usar el último saldo calculado
         if (saldoHoyVal === null) saldoHoyVal = parseFloat(saldo.toFixed(2));
 
-        const interesAcumuladoBruto = parseFloat(interesAcum.toFixed(2));
-        const interesAcumuladoNeto  = parseFloat((interesAcum * (1 - retencion / 100)).toFixed(2));
+        // KPIs: interés real acumulado hasta hoy (no proyectado al futuro)
+        const interesAcumuladoBruto = parseFloat(interesAcumHoy.toFixed(2));
+        const interesAcumuladoNeto  = parseFloat((interesAcumHoy * (1 - retencion / 100)).toFixed(2));
 
         return {
             cuenta,
