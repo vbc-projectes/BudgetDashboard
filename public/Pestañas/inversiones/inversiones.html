@@ -8,6 +8,7 @@
     <button class="subtab-btn" data-target="tabInvOperaciones" data-i18n="inversiones.tabs.operaciones">Operaciones</button>
     <button class="subtab-btn" data-target="tabInvDividendos" data-i18n="inversiones.tabs.dividendos">Dividendos</button>
     <button class="subtab-btn" data-target="tabInvResumen" data-i18n="inversiones.tabs.resumen">Resumen</button>
+    <button class="subtab-btn" data-target="tabInvCuentaRemunerada">Cuenta Remunerada</button>
   </div>
 
   <!-- ===== ACTIVOS — posiciones abiertas calculadas desde operaciones ===== -->
@@ -357,4 +358,100 @@
       <button id="invImportModalConfirm"><i class="fas fa-check"></i> <span id="invImportBtnLabel" data-i18n="formularios.importar">Importar</span></button>
     </div>
   </div>
+</div>
+
+<!-- ===== CUENTA REMUNERADA vinculada a bolsa ===== -->
+<div id="tabInvCuentaRemunerada" class="subtab display-none">
+
+    <!-- KPI cards -->
+    <div class="kpi-row" style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:18px;">
+      <div class="kpi-card" style="flex:1;min-width:140px;">
+        <div class="kpi-label" style="font-size:12px;color:#888;">Saldo disponible</div>
+        <div id="invCRSaldo" class="kpi-value" style="font-size:22px;font-weight:700;">—</div>
+      </div>
+      <div class="kpi-card" style="flex:1;min-width:140px;">
+        <div class="kpi-label" style="font-size:12px;color:#888;">Invertido en bolsa</div>
+        <div id="invCRInvertido" class="kpi-value" style="font-size:22px;font-weight:700;color:#6366f1;">—</div>
+      </div>
+      <div class="kpi-card" style="flex:1;min-width:140px;">
+        <div class="kpi-label" style="font-size:12px;color:#888;">Interés bruto acum.</div>
+        <div id="invCRInteresBruto" class="kpi-value" style="font-size:22px;font-weight:700;color:#22c55e;">—</div>
+      </div>
+      <div class="kpi-card" style="flex:1;min-width:140px;">
+        <div class="kpi-label" style="font-size:12px;color:#888;">Interés neto acum.</div>
+        <div id="invCRInteresNeto" class="kpi-value" style="font-size:22px;font-weight:700;color:#16a34a;">—</div>
+      </div>
+      <div class="kpi-card" style="flex:1;min-width:140px;">
+        <div class="kpi-label" style="font-size:12px;color:#888;">Tasa anual</div>
+        <div id="invCRPct" class="kpi-value" style="font-size:22px;font-weight:700;">—</div>
+      </div>
+    </div>
+
+    <!-- Gráfica de saldo diario -->
+    <div style="background:#fff;border-radius:10px;padding:16px;margin-bottom:18px;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+      <h4 style="margin:0 0 10px;font-size:14px;color:#555;">Saldo diario de la cuenta remunerada</h4>
+      <div style="position:relative;height:300px;">
+        <canvas id="invChartCRBalance"></canvas>
+        <div id="invChartCREmpty" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;color:#aaa;font-size:14px;flex-direction:column;gap:6px;">
+          <i class="fas fa-chart-line" style="font-size:28px;"></i>
+          <span>Sin datos — vincula una cuenta y añade operaciones</span>
+        </div>
+      </div>
+      <p style="margin:8px 0 0;font-size:11px;color:#aaa;">
+        <i class="fas fa-info-circle"></i>
+        Las compras de bolsa reducen el saldo disponible; las ventas lo incrementan.
+        El interés se calcula diariamente sobre el saldo resultante.
+      </p>
+    </div>
+
+    <!-- Tabla CRUD de cuentas remuneradas -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+      <h3 style="margin:0;font-size:15px;">Cuentas remuneradas</h3>
+    </div>
+    <div class="table-container">
+      <table id="tablaCRInv" style="font-size:13px;">
+        <thead>
+          <tr>
+            <th>Desde</th>
+            <th>Hasta</th>
+            <th>Descripción</th>
+            <th>Saldo inicial (€)</th>
+            <th>Aportación mensual (€)</th>
+            <th>Interés (%)</th>
+            <th>Retención (%)</th>
+            <th>Categoría</th>
+            <th title="Vinculada a bolsa">Vinculada</th>
+            <th>Acciones</th>
+          </tr>
+          <tr id="invCRAddRow">
+            <td><input type="month" id="invCRDesde" style="width:130px;"></td>
+            <td><input type="month" id="invCRHasta" style="width:130px;"></td>
+            <td><input type="text" id="invCRDescripcion" placeholder="Descripción" style="width:130px;"></td>
+            <td><input type="number" id="invCRMonto" placeholder="0.00" min="0" step="0.01" style="width:100px;"></td>
+            <td><input type="number" id="invCRAportacion" placeholder="0.00" min="0" step="0.01" style="width:100px;"></td>
+            <td><input type="number" id="invCRInteres" placeholder="0.00" min="0" step="0.01" style="width:80px;"></td>
+            <td><input type="number" id="invCRRetencion" placeholder="19" min="0" step="0.01" style="width:80px;"></td>
+            <td>
+              <select id="categoriaCRInv" style="width:120px;">
+                <option value="">— Categoría —</option>
+              </select>
+            </td>
+            <td style="text-align:center;">
+              <input type="checkbox" id="invCRLinkedBolsa" title="Vincular esta cuenta a bolsa">
+            </td>
+            <td>
+              <button id="btnAgregarCRInv" style="white-space:nowrap;">
+                <i class="fas fa-plus"></i> Añadir
+              </button>
+            </td>
+          </tr>
+        </thead>
+        <tbody id="tbodyCRInv">
+          <tr><td colspan="10" class="text-center text-muted">Cargando…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
 </div>

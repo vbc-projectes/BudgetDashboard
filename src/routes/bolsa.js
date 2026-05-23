@@ -88,6 +88,11 @@ router.get('/bolsa/estadisticas', async (req, res, next) => {
     try { res.json(await bolsaService.getEstadisticasOperaciones()); } catch (err) { next(err); }
 });
 
+// ── Cuenta Remunerada — saldo diario vinculado a bolsa ──────────────────
+router.get('/bolsa/cuenta-remunerada/saldo-diario', async (req, res, next) => {
+    try { res.json(await bolsaService.getSaldoDiarioCR()); } catch (err) { next(err); }
+});
+
 // ── Ticker history (DB-cached) ─────────────────────────────────────────
 // Returns cached history for a ticker. Fetches from Yahoo if stale/missing.
 router.get('/bolsa/ticker-history/:ticker', async (req, res, next) => {

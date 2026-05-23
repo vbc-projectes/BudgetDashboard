@@ -460,6 +460,152 @@ class BolsaService {
         }
         return { stats, totalAdded, totalUpdated };
     }
+
+    // ── Cuenta Remunerada — saldo diario vinculado a bolsa ─────────────
+
+    /**
+     * Calcula la serie de saldo diario de la cuenta remunerada vinculada a bolsa.
+     * - Saldo inicial = cuenta.monto en fecha cuenta.desde
+     * - 1º de cada mes posterior: suma cuenta.aportacion_mensual
+     * - Fecha de compra bolsa: resta cantidad * precio_unitario + comision
+     * - Fecha de venta bolsa: suma cantidad * precio_unitario - comision
+     * - Acumula interés diario = saldo_dia * (interes/100) / 365
+     *
+     * @returns {Object} { cuenta, saldoSeries, saldoActual, saldoInvertido,
+     *                     interesAcumuladoBruto, interesAcumuladoNeto,
+     *                     tasaAnualEfectiva }
+     */
+    async getSaldoDiarioCR() {
+        // Buscar la cuenta marcada como vinculada, o la primera si no hay ninguna
+        let cuenta = await dbGet(db,
+            `SELECT * FROM cuenta_remunerada WHERE linked_to_bolsa = 1 ORDER BY created_at LIMIT 1`
+        );
+        if (!cuenta) {
+            cuenta = await dbGet(db,
+                `SELECT * FROM cuenta_remunerada ORDER BY created_at LIMIT 1`
+            );
+        }
+        if (!cuenta) {
+            return {
+                cuenta: null,
+                saldoSeries: [],
+                saldoActual: 0,
+                saldoInvertido: 0,
+                interesAcumuladoBruto: 0,
+                interesAcumuladoNeto: 0,
+                tasaAnualEfectiva: 0
+            };
+        }
+
+        // Rango de fechas: desde CR.desde hasta CR.hasta o hoy
+        const hoy = new Date().toISOString().slice(0, 10);
+        // Support YYYY-MM (month picker) or YYYY-MM-DD (full date)
+        let fechaInicio;
+        if (cuenta.desde) {
+            fechaInicio = /^\d{4}-\d{2}$/.test(cuenta.desde)
+                ? cuenta.desde + '-01'
+                : cuenta.desde.slice(0, 10);
+        } else {
+            fechaInicio = hoy.slice(0, 7) + '-01'; // fallback: start of current month
+        }
+        const fechaFin = cuenta.hasta
+            ? (/^\d{4}-\d{2}$/.test(cuenta.hasta) ? cuenta.hasta + '-01' : cuenta.hasta.slice(0, 10))
+            : hoy;
+
+        // Todas las operaciones de bolsa, ordenadas por fecha ASC
+        const ops = await dbAll(db,
+            `SELECT fecha, tipo, cantidad, precio_unitario, comision
+             FROM operaciones_bolsa ORDER BY fecha ASC`
+        );
+
+        // Construir mapa de movimientos por fecha: fecha → importe neto (+/-)
+        const movByDate = {};
+        let totalInvertido = 0;
+        for (const op of ops) {
+            const f = op.fecha;
+            if (!movByDate[f]) movByDate[f] = 0;
+            const importe = parseFloat(op.cantidad) * parseFloat(op.precio_unitario) + parseFloat(op.comision || 0);
+            if (op.tipo === 'compra') {
+                movByDate[f] -= importe;
+                totalInvertido += importe;
+            } else {
+                // venta devuelve: cantidad * precio - comision
+                const devuelto = parseFloat(op.cantidad) * parseFloat(op.precio_unitario) - parseFloat(op.comision || 0);
+                movByDate[f] += devuelto;
+                totalInvertido -= devuelto;
+            }
+        }
+        const saldoInvertido = Math.max(0, totalInvertido);
+
+        const tasaAnual  = parseFloat(cuenta.interes) || 0;
+        const tasaDiaria = tasaAnual / 100 / 365;
+        const retencion  = parseFloat(cuenta.retencion) || 0;
+
+        // Generar serie día a día
+        const saldoSeries = [];
+        let   saldo        = parseFloat(cuenta.monto) || 0;
+        let   interesAcum  = 0;
+
+        let current = new Date(fechaInicio + 'T00:00:00');
+        const end   = new Date(fechaFin    + 'T00:00:00');
+        if (end < current) {
+            // si la fecha fin es anterior, ajustar
+            end.setTime(current.getTime());
+        }
+
+        // Extender hasta hoy si la CR todavía está activa (sin hasta)
+        const endEffective = !cuenta.hasta ? new Date(hoy + 'T00:00:00') : end;
+
+        let prevMonth = current.getMonth();
+
+        while (current <= endEffective) {
+            const fechaStr = current.toISOString().slice(0, 10);
+
+            // 1º de mes (después del mes inicial): aportación mensual
+            const curMonth = current.getMonth();
+            if (fechaStr > fechaInicio && current.getDate() === 1 && curMonth !== prevMonth) {
+                saldo += parseFloat(cuenta.aportacion_mensual) || 0;
+            }
+            prevMonth = curMonth;
+
+            // Movimientos de bolsa en este día
+            if (movByDate[fechaStr]) {
+                saldo += movByDate[fechaStr];
+            }
+
+            // Interés diario acumulado (sobre saldo del día)
+            const interesDia = saldo > 0 ? saldo * tasaDiaria : 0;
+            interesAcum += interesDia;
+
+            saldoSeries.push({ fecha: fechaStr, saldo: parseFloat(saldo.toFixed(2)) });
+
+            // Avanzar un día
+            current.setDate(current.getDate() + 1);
+        }
+
+        const saldoActual         = saldoSeries.length > 0 ? saldoSeries[saldoSeries.length - 1].saldo : saldo;
+        const interesAcumuladoBruto = parseFloat(interesAcum.toFixed(2));
+        const interesAcumuladoNeto  = parseFloat((interesAcum * (1 - retencion / 100)).toFixed(2));
+
+        // Tasa anual efectiva = interés bruto / saldo medio × 365 / días
+        const dias = saldoSeries.length || 1;
+        const saldoMedio = dias > 0
+            ? saldoSeries.reduce((s, d) => s + d.saldo, 0) / dias
+            : saldo;
+        const tasaAnualEfectiva = saldoMedio > 0
+            ? parseFloat(((interesAcum / saldoMedio) * 365 / dias * 365).toFixed(4))
+            : tasaAnual;
+
+        return {
+            cuenta,
+            saldoSeries,
+            saldoActual,
+            saldoInvertido,
+            interesAcumuladoBruto,
+            interesAcumuladoNeto,
+            tasaAnualEfectiva: tasaAnual  // usar la tasa nominal de la CR
+        };
+    }
 }
 
 module.exports = BolsaService;

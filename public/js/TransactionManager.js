@@ -177,6 +177,13 @@ class TransactionManager {
             const bruto = parseFloat(item.interes_generado) || 0;
             const ret = parseFloat(item.retencion) || 0;
             content = `<strong>${this.formatCurrency(bruto * (1 - ret / 100))}</strong>`;
+        } else if (column === 'linked_to_bolsa') {
+            const isLinked = Number(item.linked_to_bolsa) === 1;
+            if (isLinked) {
+                content = `<button class="btn-cr-vincular cr-linked" data-id="${item.id}" title="Vinculada a cartera \u2014 clic para desvincular" style="color:#6366f1;font-weight:600;white-space:nowrap;background:rgba(99,102,241,0.1);border:none;border-radius:6px;padding:3px 8px;cursor:pointer;">&#128279; Vinculada</button>`;
+            } else {
+                content = `<button class="btn-cr-vincular" data-id="${item.id}" title="Vincular esta cuenta a la cartera" style="color:#aaa;white-space:nowrap;background:none;border:1px dashed #ccc;border-radius:6px;padding:3px 8px;cursor:pointer;">Vincular</button>`;
+            }
         } else if (column === 'monto' || column === 'bruto' || column === 'aportacion_mensual' || column === 'interes_generado' || column === 'monto_ajustado') {
             content = `<strong>${this.formatCurrency(content)}</strong>`;
         } else if (column === 'interes' || column === 'ipc_porcentaje' || column === 'retencion') {
@@ -285,7 +292,7 @@ class TransactionManager {
                 const input = cell.querySelector('input, select');
                 
                 // Saltar campos de solo lectura
-                if (field === 'interes_generado' || field === 'monto_ajustado' || field === 'interes_neto') return;
+                if (field === 'interes_generado' || field === 'monto_ajustado' || field === 'interes_neto' || field === 'linked_to_bolsa') return;
                 
                 let value = input.value;
                 
@@ -350,7 +357,7 @@ class TransactionManager {
         let input;
 
         // Campos de solo lectura (no editables)
-        if (field === 'interes_generado' || field === 'monto_ajustado' || field === 'interes_neto') {
+        if (field === 'interes_generado' || field === 'monto_ajustado' || field === 'interes_neto' || field === 'linked_to_bolsa') {
             input = document.createElement('span');
             input.textContent = value;
             return input;

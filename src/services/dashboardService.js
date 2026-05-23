@@ -62,7 +62,7 @@ async function getDashboardData() {
         gastosRealesService.getAll(config.QUERY_LIMIT),
         ingresosRealesService.getAll(config.QUERY_LIMIT),
         dbAll(db, `
-        SELECT cr.id, cr.descripcion, cr.monto, cr.aportacion_mensual, cr.interes, cr.retencion, cr.desde, cr.hasta, c.nombre AS categoria
+        SELECT cr.id, cr.descripcion, cr.monto, cr.aportacion_mensual, cr.interes, cr.retencion, cr.desde, cr.hasta, cr.linked_to_bolsa, c.nombre AS categoria
         FROM cuenta_remunerada cr
         JOIN categorias c ON cr.categoria_id = c.id
         ORDER BY cr.desde DESC

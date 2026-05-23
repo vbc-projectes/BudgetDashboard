@@ -94,6 +94,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     addCuentaRemunerada: (data) => ipcRenderer.invoke('add-cuenta-remunerada', data),
     updateCuentaRemunerada: (data) => ipcRenderer.invoke('update-cuenta-remunerada', data),
     deleteCuentaRemunerada: (data) => ipcRenderer.invoke('delete-cuenta-remunerada', data),
+    setCuentaRemuneradaLink: (data) => ipcRenderer.invoke('cuenta-remunerada-set-link', data),
 
     // ============= ASSETS =============
     getAssets: () => ipcRenderer.invoke('get-assets'),
@@ -135,7 +136,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     bolsaGetResumen: () => ipcRenderer.invoke('bolsa-get-resumen'),
     bolsaGetEstadisticas: () => ipcRenderer.invoke('bolsa-get-estadisticas'),
     bolsaGetTickerHistory: (ticker) => ipcRenderer.invoke('bolsa-get-ticker-history', ticker),
-    bolsaSyncDividendos: () => ipcRenderer.invoke('bolsa-sync-dividendos')
+    bolsaSyncDividendos: () => ipcRenderer.invoke('bolsa-sync-dividendos'),
+    bolsaGetCRSaldoDiario: () => ipcRenderer.invoke('bolsa-get-cr-saldo-diario')
 });
 
 console.log('✅ Preload script cargado - API expuesta');

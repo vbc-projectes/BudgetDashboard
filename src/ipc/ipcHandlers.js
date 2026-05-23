@@ -518,23 +518,27 @@ function registerIpcHandlers() {
     });
 
     safeHandle('add-cuenta-remunerada', async (event, data) => {
-        const { descripcion, monto, aportacion_mensual, interes, retencion, categoria_id, desde, hasta } = data;
-        if (monto === undefined || categoria_id === undefined || !desde || !hasta) {
-            throw new Error('Monto, categoría, desde y hasta son requeridos');
+        const { descripcion, monto, aportacion_mensual, interes, retencion, categoria_id, desde, hasta, linked_to_bolsa } = data;
+        if (monto === undefined || categoria_id === undefined || !desde) {
+            throw new Error('Monto, categoría y desde son requeridos');
         }
 
         const descripcionFinal = (descripcion || '').trim() || generarDescripcionRandom();
         const interesGenerado = calcularInteresGenerado(monto, aportacion_mensual || 0, interes || 0, desde, hasta);
+        const linkedVal = linked_to_bolsa ? 1 : 0;
+        if (linkedVal === 1) {
+            await dbRun(db, `UPDATE cuenta_remunerada SET linked_to_bolsa = 0`);
+        }
 
         await dbRun(db, `
-            INSERT INTO cuenta_remunerada (descripcion, monto, aportacion_mensual, interes, retencion, interes_generado, categoria_id, desde, hasta)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `, [descripcionFinal, monto, aportacion_mensual || null, interes || null, retencion || 0, interesGenerado, categoria_id, desde, hasta]);
+            INSERT INTO cuenta_remunerada (descripcion, monto, aportacion_mensual, interes, retencion, interes_generado, categoria_id, desde, hasta, linked_to_bolsa)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [descripcionFinal, monto, aportacion_mensual || null, interes || null, retencion || 0, interesGenerado, categoria_id, desde, hasta || null, linkedVal]);
         return { success: true };
     });
 
     safeHandle('update-cuenta-remunerada', async (event, data) => {
-        const { id, desde, hasta, monto, aportacion_mensual, interes, retencion, categoria_id, categoria, descripcion } = data;
+        const { id, desde, hasta, monto, aportacion_mensual, interes, retencion, categoria_id, categoria, descripcion, linked_to_bolsa } = data;
         if (!id) {
             throw new Error('ID es requerido');
         }
@@ -559,11 +563,20 @@ function registerIpcHandlers() {
         }
         const interesGenerado = calcularInteresGenerado(monto, aportacion_mensual, interes, desde, hasta);
 
+        // Si se activa linked_to_bolsa, desactivar en las demás cuentas
+        const linkedVal = linked_to_bolsa !== undefined ? (linked_to_bolsa ? 1 : 0) : undefined;
+        if (linkedVal === 1) {
+            await dbRun(db, `UPDATE cuenta_remunerada SET linked_to_bolsa = 0 WHERE id != ?`, [id]);
+        }
+
+        const linkedSet = linkedVal !== undefined ? ', linked_to_bolsa=?' : '';
+        const linkedParam = linkedVal !== undefined ? [linkedVal] : [];
+
         await dbRun(db, `
             UPDATE cuenta_remunerada 
-            SET descripcion = ?, desde = ?, hasta = ?, monto = ?, aportacion_mensual = ?, interes = ?, retencion = ?, interes_generado = ?, categoria_id = ?
+            SET descripcion = ?, desde = ?, hasta = ?, monto = ?, aportacion_mensual = ?, interes = ?, retencion = ?, interes_generado = ?, categoria_id = ?${linkedSet}
             WHERE id = ?
-        `, [descripcionFinal, desde, hasta, monto, aportacion_mensual || null, interes || null, retencion !== undefined ? (parseFloat(retencion) || 0) : 0, interesGenerado, catId, id]);
+        `, [descripcionFinal, desde, hasta, monto, aportacion_mensual || null, interes || null, retencion !== undefined ? (parseFloat(retencion) || 0) : 0, interesGenerado, catId, ...linkedParam, id]);
 
         return { success: true };
     });
@@ -574,6 +587,16 @@ function registerIpcHandlers() {
             throw new Error('ID es requerido');
         }
         await dbRun(db, "DELETE FROM cuenta_remunerada WHERE id = ?", [id]);
+        return { success: true };
+    });
+
+    safeHandle('cuenta-remunerada-set-link', async (event, data) => {
+        const { id, linked } = data;
+        if (!id) throw new Error('ID requerido');
+        await dbRun(db, 'UPDATE cuenta_remunerada SET linked_to_bolsa = 0');
+        if (linked) {
+            await dbRun(db, 'UPDATE cuenta_remunerada SET linked_to_bolsa = 1 WHERE id = ?', [id]);
+        }
         return { success: true };
     });
 
@@ -953,6 +976,10 @@ function registerIpcHandlers() {
         }
         const history = await bolsaService.getTickerHistoryFromDb(norm);
         return { ticker: norm, data: history };
+    });
+
+    safeHandle('bolsa-get-cr-saldo-diario', async () => {
+        return await bolsaService.getSaldoDiarioCR();
     });
 
     safeHandle('bolsa-sync-dividendos', async () => {

@@ -151,6 +151,7 @@ window.API = {
             'POST:/add/cuenta_remunerada':         () => api.addCuentaRemunerada(body),
             'POST:/update/cuenta_remunerada':      () => api.updateCuentaRemunerada(body),
             'POST:/delete/cuenta_remunerada':      () => api.deleteCuentaRemunerada(body),
+            'POST:/cuenta_remunerada/set-link':    () => api.setCuentaRemuneradaLink(body),
             // Assets (legacy)
             'GET:/assets':                         () => api.getAssets(),
             'POST:/add/asset':                     () => api.addAsset(body),
@@ -179,6 +180,7 @@ window.API = {
             'GET:/bolsa/resumen':                  () => api.bolsaGetResumen(),
             'GET:/bolsa/estadisticas':             () => api.bolsaGetEstadisticas(),
             'POST:/bolsa/sync-dividendos':         () => api.bolsaSyncDividendos(),
+            'GET:/bolsa/cuenta-remunerada/saldo-diario': () => api.bolsaGetCRSaldoDiario(),
         };
 
         const exactKey = `${method}:${basePath}`;

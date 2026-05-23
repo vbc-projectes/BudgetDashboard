@@ -32,7 +32,7 @@ function cargarIngresosForm() {
         customColumns: {
             puntual: ['fecha', 'descripcion', 'monto', 'bruto', 'categoria'],
             mensual: ['desde', 'hasta', 'descripcion', 'monto', 'bruto', 'categoria'],
-            cuentaRemunerada: ['desde', 'hasta', 'descripcion', 'monto', 'aportacion_mensual', 'interes', 'retencion', 'interes_generado', 'interes_neto', 'categoria']
+            cuentaRemunerada: ['desde', 'hasta', 'descripcion', 'monto', 'aportacion_mensual', 'interes', 'retencion', 'interes_generado', 'interes_neto', 'categoria', 'linked_to_bolsa']
         },
         showOldFlag: 'showOldIngresos'
     });
@@ -175,22 +175,22 @@ function cargarIngresosForm() {
             const interes = parseFloat(document.getElementById('interesCuentaRemunerada').value) || null;
             const retencion = parseFloat(document.getElementById('retencionCuentaRemunerada').value) || 0;
             const selectCatCR = document.getElementById('categoriaCuentaRemunerada');
-            const categoria_id = selectCatCR.value;
+            const categoria_id = selectCatCR ? selectCatCR.value : null;
+            const linked_to_bolsa = document.getElementById('linkedBolsaCR')?.checked ? 1 : 0;
 
             const validarMes = (valor) => /^\d{4}-(0[1-9]|1[0-2])$/.test(valor);
 
             if (!desde) return showAlert(ingresosManager.t('ingresos.ingresaDesde'));
-            if (!hasta) return showAlert(ingresosManager.t('ingresos.ingresaHasta'));
-            if (isNaN(monto) || monto <= 0) return showAlert(ingresosManager.t('ingresos.montoInicialInvalido'));
+            if (isNaN(monto) || monto <= 0) return showAlert(ingresosManager.t('ingresos.montoInicialInvalido', 'Monto inválido'));
             if (!categoria_id) return showAlert(ingresosManager.t('ingresos.seleccionaCategoria'));
             if (!validarMes(desde)) return showAlert(ingresosManager.t('ingresos.formatoDesde'));
-            if (!validarMes(hasta)) return showAlert(ingresosManager.t('ingresos.formatoHasta'));
-            if (desde > hasta) return showAlert(ingresosManager.t('ingresos.desdeNoMayorHasta'));
+            if (hasta && !validarMes(hasta)) return showAlert(ingresosManager.t('ingresos.formatoHasta'));
+            if (hasta && desde > hasta) return showAlert(ingresosManager.t('ingresos.desdeNoMayorHasta'));
 
             const resCR = await fetch('/add/cuenta_remunerada', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ desde, hasta, descripcion, monto, aportacion_mensual, interes, retencion, categoria_id })
+                body: JSON.stringify({ desde, hasta: hasta || null, descripcion, monto, aportacion_mensual, interes, retencion, categoria_id, linked_to_bolsa })
             });
 
             if (!resCR.ok) {
@@ -205,7 +205,9 @@ function cargarIngresosForm() {
             document.getElementById('aportacionMensualCR').value = '';
             document.getElementById('interesCuentaRemunerada').value = '';
             document.getElementById('retencionCuentaRemunerada').value = '';
-            
+            const chkLink = document.getElementById('linkedBolsaCR');
+            if (chkLink) chkLink.checked = false;
+
             ingresosManager.loadData();
             if (typeof cargarResumenPeriodos === 'function') cargarResumenPeriodos();
             if (typeof notifySuccess === 'function') {
@@ -213,6 +215,29 @@ function cargarIngresosForm() {
             }
         };
     }
+
+    // ===== VINCULAR/DESVINCULAR CUENTA REMUNERADA DE CARTERA =====
+    // Delegación en el tbody para manejar los botones .btn-cr-vincular
+    document.querySelector('#tablaCuentaRemunerada tbody')?.addEventListener('click', async e => {
+        const btn = e.target.closest('.btn-cr-vincular');
+        if (!btn) return;
+        const id = btn.dataset.id;
+        const isLinked = btn.classList.contains('cr-linked');
+        // Si ya está vinculada → desvincular; si no → vincular
+        const linked = isLinked ? 0 : 1;
+        try {
+            const res = await fetch('/cuenta_remunerada/set-link', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, linked })
+            });
+            if (!res.ok) throw new Error('Error al actualizar');
+            ingresosManager.loadData();
+            window.showToast?.(linked ? 'Cuenta vinculada a la cartera' : 'Cuenta desvinculada de la cartera', 'success');
+        } catch (err) {
+            window.showToast?.('Error: ' + err.message, 'error');
+        }
+    });
 
     // ===== TOGGLE MOSTRAR ANTIGUOS =====
     window.showOldIngresos = false;

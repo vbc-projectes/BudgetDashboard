@@ -18,6 +18,8 @@ if (!window._inv) {
         chartAlloc:  null,
         chartPnl:    null,
         chartEvol:   null,
+        chartCR:     null,
+        crData:      null,
         evolPeriod:  '3mo',
         dataTs:      0      // timestamp del último fetch completo
     };
@@ -89,6 +91,7 @@ function _showSubtab(targetId) {
         if (_inv.chartAlloc) _inv.chartAlloc.resize();
         if (_inv.chartPnl)   _inv.chartPnl.resize();
         if (_inv.chartEvol)  _inv.chartEvol.resize();
+        if (_inv.chartCR)    _inv.chartCR.resize();
     });
 }
 
@@ -690,6 +693,7 @@ async function _refreshAll(force = false) {
     if (active.id === 'tabInvActivos') await _renderActivos();
     if (active.id === 'tabInvCartera') await _renderCartera();
     if (active.id === 'tabInvResumen') await _renderResumen();
+    if (active.id === 'tabInvCuentaRemunerada') await loadCuentaRemuneradaTab();
 }
 
 // ── Cerrar posición ────────────────────────────────────────────────────
@@ -1054,8 +1058,303 @@ async function _renderResumen() {
     }
 }
 
+// ── Cuenta Remunerada vinculada a bolsa ──────────────────────────────
+
+async function loadCuentaRemuneradaTab() {
+    let data, cuentas;
+    try {
+        const [r1, r2] = await Promise.all([
+            fetch('/bolsa/cuenta-remunerada/saldo-diario'),
+            fetch('/cuenta_remunerada')
+        ]);
+        if (!r1.ok) {
+            const errData = await r1.json().catch(() => ({}));
+            console.error('[CuentaRemunerada] saldo-diario error:', errData);
+            window.showToast?.('Error al cargar datos de cuenta remunerada: ' + (errData.error || r1.status), 'error');
+        }
+        data   = r1.ok ? await r1.json() : null;
+        cuentas = r2.ok ? await r2.json() : [];
+    } catch (err) {
+        window.showToast?.('Error al cargar cuenta remunerada: ' + err.message, 'error');
+        return;
+    }
+    _inv.crData = data;
+
+    // KPIs
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    if (data && data.cuenta) {
+        set('invCRSaldo',       _fmt(data.saldoActual));
+        set('invCRInvertido',   _fmt(data.saldoInvertido));
+        set('invCRInteresBruto',_fmt(data.interesAcumuladoBruto));
+        set('invCRInteresNeto', _fmt(data.interesAcumuladoNeto));
+        set('invCRPct',         (data.tasaAnualEfectiva || 0).toFixed(2) + ' %');
+    } else {
+        ['invCRSaldo','invCRInvertido','invCRInteresBruto','invCRInteresNeto','invCRPct']
+            .forEach(id => set(id, '—'));
+    }
+
+    try { _renderCRChart(data); } catch(e) { console.error('Error rendering CR chart:', e); }
+    try { _renderCRTable(cuentas); } catch(e) { console.error('Error rendering CR table:', e); }
+    await _loadCRCategorias();
+
+    // Debug: log what was received
+    console.log('[CuentaRemunerada] data:', data ? `cuenta=${data.cuenta?.descripcion}, series=${data.saldoSeries?.length}` : 'null', '| cuentas:', Array.isArray(cuentas) ? cuentas.length : cuentas);
+}
+
+function _renderCRChart(data) {
+    const canvas  = document.getElementById('invChartCRBalance');
+    const emptyEl = document.getElementById('invChartCREmpty');
+    if (!canvas) return;
+
+    if (!data || !data.saldoSeries || !data.saldoSeries.length) {
+        canvas.style.display = 'none';
+        if (emptyEl) {
+            emptyEl.style.display = 'flex';
+            const span = emptyEl.querySelector('span');
+            if (span) {
+                if (!data) {
+                    span.textContent = 'Error al cargar datos — revisa la consola (Ctrl+Shift+I)';
+                } else if (!data.cuenta) {
+                    span.textContent = 'Sin cuenta vinculada — ve a Ingresos → Cuenta Remunerada y pulsa "Vincular"';
+                } else {
+                    span.textContent = 'Sin datos para el rango de fechas de la cuenta (' + (data.cuenta.desde || '?') + ' → ' + (data.cuenta.hasta || 'hoy') + ')';
+                }
+            }
+        }
+        if (_inv.chartCR) { try { _inv.chartCR.destroy(); } catch (_) {} _inv.chartCR = null; }
+        return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+    canvas.style.display = 'block';
+
+    if (_inv.chartCR) { try { _inv.chartCR.destroy(); } catch (_) {} _inv.chartCR = null; }
+
+    const series = data.saldoSeries;
+    // Reducir puntos: mostrar máx 400 puntos (toma cada N días)
+    const step = Math.max(1, Math.floor(series.length / 400));
+    const reduced = series.filter((_, i) => i % step === 0 || i === series.length - 1);
+
+    const labels   = reduced.map(p => p.fecha);
+    const saldos   = reduced.map(p => p.saldo);
+
+    // Marcar las fechas con operaciones de bolsa
+    const opDates = {};
+    for (const op of (_inv.operaciones || [])) {
+        if (!opDates[op.fecha]) opDates[op.fecha] = [];
+        opDates[op.fecha].push(op.tipo);
+    }
+
+    _inv.chartCR = new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Saldo CR',
+                data: saldos,
+                borderColor: '#6366f1',
+                backgroundColor: 'rgba(99,102,241,0.08)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.2,
+                pointRadius: labels.map(f => opDates[f] ? 5 : 0),
+                pointBackgroundColor: labels.map(f => {
+                    if (!opDates[f]) return 'transparent';
+                    return opDates[f].includes('compra') ? '#ef4444' : '#22c55e';
+                }),
+                pointHoverRadius: 5,
+                spanGaps: true
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                datalabels: { display: false },
+                tooltip: {
+                    mode: 'index', intersect: false,
+                    callbacks: {
+                        label: ctx => {
+                            const f = labels[ctx.dataIndex];
+                            const ops = opDates[f];
+                            let extra = '';
+                            if (ops) extra = ' — ' + ops.map(t => t === 'compra' ? '▼ compra' : '▲ venta').join(', ');
+                            return ` Saldo: ${_fmt(ctx.parsed.y)}${extra}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { ticks: { color: '#555', maxTicksLimit: 12, maxRotation: 30 }, grid: { color: 'rgba(0,0,0,0.05)' } },
+                y: { ticks: { color: '#555', callback: v => _fmt(v, 0) }, grid: { color: 'rgba(0,0,0,0.06)' } }
+            },
+            interaction: { mode: 'nearest', axis: 'x', intersect: false }
+        }
+    });
+    // Force resize after a short delay to handle cases where canvas dimensions
+    // weren't fully computed at chart-creation time
+    setTimeout(() => { if (_inv.chartCR) try { _inv.chartCR.resize(); } catch (_) {} }, 50);
+}
+
+function _renderCRTable(cuentas) {
+    const tbody = document.getElementById('tbodyCRInv');
+    if (!tbody) return;
+    if (!cuentas || !cuentas.length) {
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">No hay cuentas remuneradas. Añade una arriba.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = cuentas.map(c => {
+        const linkedBadge = c.linked_to_bolsa
+            ? '<span style="color:#6366f1;font-weight:600;" title="Vinculada">✓</span>'
+            : '<span style="color:#ccc;">—</span>';
+        return `<tr data-id="${c.id}">
+            <td>${c.desde || '—'}</td>
+            <td>${c.hasta || 'Activa'}</td>
+            <td>${c.descripcion || '—'}</td>
+            <td style="text-align:right;">${_fmt(c.monto)}</td>
+            <td style="text-align:right;">${c.aportacion_mensual ? _fmt(c.aportacion_mensual) : '—'}</td>
+            <td style="text-align:right;">${c.interes ? c.interes + ' %' : '—'}</td>
+            <td style="text-align:right;">${c.retencion ? c.retencion + ' %' : '—'}</td>
+            <td>${c.categoria || '—'}</td>
+            <td style="text-align:center;">${linkedBadge}</td>
+            <td>
+                <button class="btn-icon btn-cr-edit" data-id="${c.id}" title="Editar" style="margin-right:4px;"><i class="fas fa-edit"></i></button>
+                <button class="btn-icon btn-cr-del"  data-id="${c.id}" title="Eliminar"><i class="fas fa-trash"></i></button>
+            </td>
+        </tr>`;
+    }).join('');
+
+    // Delegate events
+    tbody.onclick = e => {
+        const editBtn = e.target.closest('.btn-cr-edit');
+        if (editBtn) { _editCR(editBtn.dataset.id, cuentas); return; }
+        const delBtn  = e.target.closest('.btn-cr-del');
+        if (delBtn)  { _deleteCR(delBtn.dataset.id); }
+    };
+}
+
+async function _loadCRCategorias() {
+    const sel = document.getElementById('categoriaCRInv');
+    if (!sel || sel.options.length > 1) return; // ya cargado
+    try {
+        const r = await fetch('/categorias');
+        if (!r.ok) return;
+        const data = await r.json();
+        const ingresos = Array.isArray(data) ? data.filter(c => c.tipo === 'ingreso') : (data.ingresos || []);
+        ingresos.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.id; opt.textContent = c.nombre;
+            sel.appendChild(opt);
+        });
+    } catch (_) {}
+}
+
+async function _addCREntry() {
+    const desde      = document.getElementById('invCRDesde')?.value;
+    const hasta      = document.getElementById('invCRHasta')?.value || null;
+    const descripcion= document.getElementById('invCRDescripcion')?.value.trim() || '';
+    const monto      = parseFloat(document.getElementById('invCRMonto')?.value);
+    const aportacion = parseFloat(document.getElementById('invCRAportacion')?.value) || null;
+    const interes    = parseFloat(document.getElementById('invCRInteres')?.value) || null;
+    const retencion  = parseFloat(document.getElementById('invCRRetencion')?.value) || 0;
+    const catId      = document.getElementById('categoriaCRInv')?.value || null;
+    const linked     = document.getElementById('invCRLinkedBolsa')?.checked ? 1 : 0;
+
+    if (!desde || isNaN(monto)) {
+        window.showToast?.('Fecha inicio y monto son obligatorios.', 'warning');
+        return;
+    }
+    try {
+        const res = await fetch('/add/cuenta_remunerada', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ desde, hasta, descripcion, monto, aportacion_mensual: aportacion, interes, retencion, categoria_id: catId, linked_to_bolsa: linked })
+        });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error'); }
+        // Clear form
+        ['invCRDesde','invCRHasta','invCRDescripcion','invCRMonto','invCRAportacion','invCRInteres','invCRRetencion']
+            .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+        const chk = document.getElementById('invCRLinkedBolsa');
+        if (chk) chk.checked = false;
+        _inv.crData = null; // invalidar cache
+        await loadCuentaRemuneradaTab();
+        window.showToast?.('Cuenta remunerada añadida', 'success');
+    } catch (err) { window.showToast?.('Error: ' + err.message, 'error'); }
+}
+
+function _editCR(id, cuentas) {
+    const c = cuentas.find(x => String(x.id) === String(id));
+    if (!c) return;
+    const tr = document.querySelector(`#tbodyCRInv tr[data-id="${id}"]`);
+    if (!tr) return;
+
+    tr.innerHTML = `
+        <td><input type="month" value="${c.desde||''}" id="crEditDesde" style="width:120px;"></td>
+        <td><input type="month" value="${c.hasta||''}" id="crEditHasta" style="width:120px;"></td>
+        <td><input type="text"  value="${(c.descripcion||'').replace(/"/g,'&quot;')}" id="crEditDesc" style="width:120px;"></td>
+        <td><input type="number" value="${c.monto||0}" id="crEditMonto" step="0.01" style="width:90px;"></td>
+        <td><input type="number" value="${c.aportacion_mensual||''}" id="crEditAport" step="0.01" style="width:90px;"></td>
+        <td><input type="number" value="${c.interes||''}" id="crEditInteres" step="0.01" style="width:70px;"></td>
+        <td><input type="number" value="${c.retencion||0}" id="crEditRet" step="0.01" style="width:70px;"></td>
+        <td><input type="text"  value="${(c.categoria||'').replace(/"/g,'&quot;')}" id="crEditCat" style="width:100px;"></td>
+        <td style="text-align:center;"><input type="checkbox" id="crEditLinked" ${c.linked_to_bolsa ? 'checked' : ''}></td>
+        <td>
+            <button class="btn-icon btn-cr-save" data-id="${id}" title="Guardar" style="margin-right:4px;"><i class="fas fa-check"></i></button>
+            <button class="btn-icon btn-cr-cancel" title="Cancelar"><i class="fas fa-times"></i></button>
+        </td>`;
+
+    tr.querySelector('.btn-cr-save').onclick = () => _saveCR(id);
+    tr.querySelector('.btn-cr-cancel').onclick = () => loadCuentaRemuneradaTab();
+}
+
+async function _saveCR(id) {
+    const data = {
+        id,
+        desde:             document.getElementById('crEditDesde')?.value,
+        hasta:             document.getElementById('crEditHasta')?.value || null,
+        descripcion:       document.getElementById('crEditDesc')?.value.trim(),
+        monto:             parseFloat(document.getElementById('crEditMonto')?.value) || 0,
+        aportacion_mensual:parseFloat(document.getElementById('crEditAport')?.value) || null,
+        interes:           parseFloat(document.getElementById('crEditInteres')?.value) || null,
+        retencion:         parseFloat(document.getElementById('crEditRet')?.value) || 0,
+        categoria:         document.getElementById('crEditCat')?.value.trim() || null,
+        linked_to_bolsa:   document.getElementById('crEditLinked')?.checked ? 1 : 0
+    };
+    try {
+        const res = await fetch('/update/cuenta_remunerada', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error'); }
+        _inv.crData = null;
+        await loadCuentaRemuneradaTab();
+        window.showToast?.('Cuenta remunerada actualizada', 'success');
+    } catch (err) { window.showToast?.('Error: ' + err.message, 'error'); }
+}
+
+async function _deleteCR(id) {
+    if (!confirm('¿Eliminar esta cuenta remunerada?')) return;
+    try {
+        const res = await fetch('/delete/cuenta_remunerada', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id })
+        });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error'); }
+        _inv.crData = null;
+        await loadCuentaRemuneradaTab();
+        window.showToast?.('Cuenta remunerada eliminada', 'success');
+    } catch (err) { window.showToast?.('Error: ' + err.message, 'error'); }
+}
+
 // ── Entry point — se llama en cada apertura de la pestaña ────────────
-async function initInversiones() {    // Asegurar que las tablas de bolsa existen (ejecuta migraciones pendientes)
+async function initInversiones() {
+    // Destroy charts from previous DOM (DOM is fully rebuilt on every tab visit)
+    ['chartCR', 'chartAlloc', 'chartPnl', 'chartEvol'].forEach(key => {
+        if (_inv[key]) { try { _inv[key].destroy(); } catch (_) {} _inv[key] = null; }
+    });
+
+    // Asegurar que las tablas de bolsa existen (ejecuta migraciones pendientes)
     try { await fetch('/bolsa/ensure-setup', { method: 'POST' }); } catch (_) {}
     // Siempre recarga datos (con caché 60 s) y recablea eventos,
     // porque loadTab() reconstruye el DOM cada visita.
@@ -1075,6 +1374,7 @@ async function initInversiones() {    // Asegurar que las tablas de bolsa existe
             if (btn.dataset.target === 'tabInvActivos') await _renderActivos();
             if (btn.dataset.target === 'tabInvCartera') await _renderCartera();
             if (btn.dataset.target === 'tabInvResumen') await _renderResumen();
+            if (btn.dataset.target === 'tabInvCuentaRemunerada') await loadCuentaRemuneradaTab();
         });
     });
 
@@ -1123,6 +1423,9 @@ async function initInversiones() {    // Asegurar que las tablas de bolsa existe
 
     // ── Refresh resumen
     document.getElementById('btnRefreshResumen')?.addEventListener('click', _renderResumen);
+
+    // ── Cuenta Remunerada
+    document.getElementById('btnAgregarCRInv')?.addEventListener('click', _addCREntry);
 }
 
 if (typeof module !== 'undefined') module.exports = { initInversiones };
