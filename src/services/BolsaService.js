@@ -468,8 +468,8 @@ class BolsaService {
      * Delegado a CuentaRemuneradaService.getSaldoDiario().
      * Mantenido por compatibilidad con código existente.
      */
-    async getSaldoDiarioCR() {
-        return new CuentaRemuneradaService().getSaldoDiario();
+    async getSaldoDiarioCR(retencionDivPct = 0) {
+        return new CuentaRemuneradaService().getSaldoDiario(retencionDivPct);
     }
 }
 

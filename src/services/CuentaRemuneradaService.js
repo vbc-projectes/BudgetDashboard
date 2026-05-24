@@ -32,7 +32,7 @@ class CuentaRemuneradaService {
      * Motor de simulación interno.
      * @param {boolean} fullSeries - Si true, genera saldoSeries completo hasta fechaFin (puede ser futuro).
      */
-    async _simulate(fullSeries) {
+    async _simulate(fullSeries, retencionDivPct = 0) {
         // Obtener CR vinculada (o la primera disponible si no hay ninguna vinculada)
         let cuenta = await dbGet(db,
             `SELECT * FROM cuenta_remunerada WHERE linked_to_bolsa = 1 ORDER BY created_at LIMIT 1`
@@ -83,6 +83,21 @@ class CuentaRemuneradaService {
             }
         }
         const saldoInvertido = Math.max(0, totalInvertido);
+
+        // Dividendos → ingresos netos que entran en la cuenta remunerada
+        const dividendos = await dbAll(db,
+            `SELECT fecha, importe_bruto, retencion FROM dividendos ORDER BY fecha ASC`
+        );
+        const divByDate = {};
+        for (const div of dividendos) {
+            const f = (div.fecha || '').slice(0, 10);
+            const bruto = parseFloat(div.importe_bruto) || 0;
+            const ret   = (parseFloat(div.retencion) || 0) !== 0
+                ? parseFloat(div.retencion)
+                : bruto * retencionDivPct / 100;
+            const neto = bruto - ret;
+            if (neto > 0) divByDate[f] = (divByDate[f] || 0) + neto;
+        }
 
         const tasaAnual  = parseFloat(cuenta.interes) || 0;
         const tasaDiaria = tasaAnual / 100 / 365;
@@ -149,6 +164,9 @@ class CuentaRemuneradaService {
             // Movimientos de bolsa en este día
             if (movByDate[fechaStr]) saldo += movByDate[fechaStr];
 
+            // Ingresos por dividendos (neto de retención)
+            if (divByDate[fechaStr]) saldo += divByDate[fechaStr];
+
             // Ajuste manual: sobreescribe el saldo calculado con el valor correcto del usuario
             if (ajusteByFecha.has(fechaStr)) saldo = ajusteByFecha.get(fechaStr);
 
@@ -191,8 +209,8 @@ class CuentaRemuneradaService {
      * La serie se extiende hasta cuenta.hasta aunque sea una fecha futura.
      * Incluye saldoHoy = saldo en min(hoy, cuenta.hasta).
      */
-    async getSaldoDiario() {
-        return this._simulate(true);
+    async getSaldoDiario(retencionDivPct = 0) {
+        return this._simulate(true, retencionDivPct);
     }
 
     /**
@@ -200,8 +218,8 @@ class CuentaRemuneradaService {
      * No devuelve saldoSeries — mucho más rápido que getSaldoDiario().
      * Devuelve { cuenta, saldo, saldoInvertido, interesAcumuladoBruto, interesAcumuladoNeto, tasaAnualEfectiva }
      */
-    async getSaldoHoy() {
-        const r = await this._simulate(false);
+    async getSaldoHoy(retencionDivPct = 0) {
+        const r = await this._simulate(false, retencionDivPct);
         return {
             cuenta:                r.cuenta,
             saldo:                 r.saldoHoy,

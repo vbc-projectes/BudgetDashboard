@@ -536,6 +536,17 @@ function initAjustes() {
         languageSelect.dataset.listenerAdded = 'true';
     }
 
+    const retencionInput = document.getElementById('retencionDividendosInput');
+    if (retencionInput && !retencionInput.dataset.listenerAdded) {
+        retencionInput.value = parseFloat(localStorage.getItem('retencionDividendos') || '0');
+        retencionInput.addEventListener('change', (e) => {
+            const val = Math.max(0, Math.min(100, parseFloat(e.target.value) || 0));
+            e.target.value = val;
+            localStorage.setItem('retencionDividendos', val);
+        });
+        retencionInput.dataset.listenerAdded = 'true';
+    }
+
     const themeSelect = document.getElementById('themeSelect');
     if (themeSelect && !themeSelect.dataset.listenerAdded) {
         const temaGuardado = localStorage.getItem('tema') || 'azul';

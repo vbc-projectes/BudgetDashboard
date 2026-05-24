@@ -639,8 +639,12 @@ function _renderDividendos() {
     // Sort by date desc
     const sorted = [..._inv.dividendos].sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
 
+    const retencionGlobal = parseFloat(localStorage.getItem('retencionDividendos') || '0');
+
     tbody.innerHTML = sorted.map(d => {
-        const neto  = (d.importe_bruto || 0) - (d.retencion || 0);
+        const bruto     = d.importe_bruto || 0;
+        const retencion = (d.retencion || 0) !== 0 ? (d.retencion || 0) : bruto * retencionGlobal / 100;
+        const neto      = bruto - retencion;
         const badge = d.source === 'auto'
             ? '<span style="font-size:10px;background:#6366f120;color:#818cf8;padding:2px 6px;border-radius:4px;">Auto</span>'
             : '<span style="font-size:10px;background:#f59e0b20;color:#f59e0b;padding:2px 6px;border-radius:4px;">Manual</span>';
@@ -654,8 +658,8 @@ function _renderDividendos() {
             <td>${d.fecha}</td>
             <td>${d.importe_por_accion ? _fmt(d.importe_por_accion, 4) : '—'}</td>
             <td>${acciones}</td>
-            <td>${_fmt(d.importe_bruto)}</td>
-            <td>${_fmt(d.retencion || 0)}</td>
+            <td>${_fmt(bruto)}</td>
+            <td>${_fmt(retencion)}</td>
             <td>${_fmt(neto)}</td>
             <td>${badge}</td>
         </tr>`;
@@ -1063,7 +1067,8 @@ async function _renderResumen() {
 async function loadCuentaRemuneradaTab() {
     let data;
     try {
-        const r1 = await fetch('/bolsa/cuenta-remunerada/saldo-diario');
+        const retencionDivPct = parseFloat(localStorage.getItem('retencionDividendos') || '0');
+        const r1 = await fetch('/bolsa/cuenta-remunerada/saldo-diario?retencionDivPct=' + retencionDivPct);
         if (!r1.ok) {
             const errData = await r1.json().catch(() => ({}));
             console.error('[CuentaRemunerada] saldo-diario error:', errData);
@@ -1140,6 +1145,19 @@ function _renderCRChart(data) {
         opDates[op.fecha].push(op.tipo);
     }
 
+    // Marcar las fechas con dividendos
+    const retencionDivPct = parseFloat(localStorage.getItem('retencionDividendos') || '0');
+    const divDates = {};
+    for (const div of (_inv.dividendos || [])) {
+        const f = (div.fecha || '').slice(0, 10);
+        const bruto = parseFloat(div.importe_bruto) || 0;
+        const ret   = (parseFloat(div.retencion) || 0) !== 0
+            ? parseFloat(div.retencion)
+            : bruto * retencionDivPct / 100;
+        const neto = bruto - ret;
+        if (neto > 0) divDates[f] = (divDates[f] || 0) + neto;
+    }
+
     _inv.chartCR = new Chart(canvas, {
         type: 'line',
         data: {
@@ -1152,12 +1170,18 @@ function _renderCRChart(data) {
                 borderWidth: 2,
                 fill: true,
                 tension: 0.2,
-                pointRadius: labels.map(f => opDates[f] ? 5 : 0),
+                pointRadius: labels.map(f => (opDates[f] || divDates[f]) ? 5 : 0),
                 pointBackgroundColor: labels.map(f => {
-                    if (!opDates[f]) return 'transparent';
-                    return opDates[f].includes('compra') ? '#ef4444' : '#22c55e';
+                    if (opDates[f]) return opDates[f].includes('compra') ? '#ef4444' : '#22c55e';
+                    if (divDates[f]) return '#f59e0b';
+                    return 'transparent';
                 }),
-                pointHoverRadius: 5,
+                pointBorderColor: labels.map(f => {
+                    if (opDates[f]) return opDates[f].includes('compra') ? '#ef4444' : '#22c55e';
+                    if (divDates[f]) return '#f59e0b';
+                    return 'transparent';
+                }),
+                pointHoverRadius: 7,
                 spanGaps: true
             }]
         },
@@ -1172,8 +1196,10 @@ function _renderCRChart(data) {
                         label: ctx => {
                             const f = labels[ctx.dataIndex];
                             const ops = opDates[f];
+                            const div = divDates[f];
                             let extra = '';
-                            if (ops) extra = ' — ' + ops.map(t => t === 'compra' ? '▼ compra' : '▲ venta').join(', ');
+                            if (ops) extra += ' — ' + ops.map(t => t === 'compra' ? '▼ compra' : '▲ venta').join(', ');
+                            if (div) extra += ` — ★ dividendo: +${_fmt(div)}`;
                             return ` Saldo: ${_fmt(ctx.parsed.y)}${extra}`;
                         }
                     }

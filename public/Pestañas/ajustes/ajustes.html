@@ -58,6 +58,12 @@
             </select>
         </article>
 
+        <article class="ajustes-section">
+            <label for="retencionDividendosInput"><i class="fas fa-percent"></i> <span data-i18n="ajustes.retencionDividendos">Retención dividendos (%):</span></label>
+            <input type="number" id="retencionDividendosInput" min="0" max="100" step="0.01" value="0" style="width:100px;padding:6px 10px;border-radius:6px;border:1px solid var(--color-border,#ddd);font-size:14px;">
+            <p style="font-size:12px;color:var(--color-muted,#888);margin-top:6px;" data-i18n="ajustes.retencionDividendosNota">Se aplica automáticamente a todos los dividendos que no tengan retención propia.</p>
+        </article>
+
         <article class="ajustes-section ajustes-user">
             <h3><i class="fas fa-user"></i> <span data-i18n="ajustes.usuarioActivo">Usuario activo</span></h3>
             <p id="currentUserLabel" data-i18n="usuarios.sinUsuario">Sin usuario</p>

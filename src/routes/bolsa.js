@@ -90,7 +90,10 @@ router.get('/bolsa/estadisticas', async (req, res, next) => {
 
 // ── Cuenta Remunerada — saldo diario vinculado a bolsa ──────────────────
 router.get('/bolsa/cuenta-remunerada/saldo-diario', async (req, res, next) => {
-    try { res.json(await bolsaService.getSaldoDiarioCR()); } catch (err) { next(err); }
+    try {
+        const retencionDivPct = Math.max(0, Math.min(100, parseFloat(req.query.retencionDivPct) || 0));
+        res.json(await bolsaService.getSaldoDiarioCR(retencionDivPct));
+    } catch (err) { next(err); }
 });
 
 // ── Ticker history (DB-cached) ─────────────────────────────────────────

@@ -87,9 +87,11 @@ router.post('/delete/cuenta_remunerada', async (req, res, next) => {
 
 // Snapshot del saldo de la cuenta remunerada a día de hoy
 router.get('/cuenta-remunerada/saldo-hoy', async (req, res, next) => {
+    // retencionDivPct: porcentaje de retención sobre dividendos (0-100)
     try {
         const service = new CuentaRemuneradaService();
-        res.json(await service.getSaldoHoy());
+        const retencionDivPct = Math.max(0, Math.min(100, parseFloat(req.query.retencionDivPct) || 0));
+        res.json(await service.getSaldoHoy(retencionDivPct));
     } catch (err) { next(err); }
 });
 

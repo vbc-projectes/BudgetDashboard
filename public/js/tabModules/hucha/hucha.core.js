@@ -38,7 +38,7 @@ async function cargarHucha() {
         async loadData() {
             const [resHucha, resCRSaldo, resBolsaPos] = await Promise.all([
                 fetch('/hucha'),
-                fetch('/cuenta-remunerada/saldo-hoy'),
+                fetch('/cuenta-remunerada/saldo-hoy?retencionDivPct=' + (parseFloat(localStorage.getItem('retencionDividendos') || '0')),),
                 fetch('/bolsa/posiciones')
             ]);
 
