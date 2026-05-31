@@ -58,13 +58,13 @@ const {
     ensureUserFolders
 } = require('./src/config/userManager');
 const db = require('./src/config/database');
+const logger = require('./src/utils/logger');
 
 // ── Start ────────────────────────────────────────────────────────────
 const PORT = config.PORT;
 app.listen(PORT, async () => {
-    console.log(`🚀 DashboardEconomic web server running on http://localhost:${PORT}`);
-    console.log(`   NODE_ENV: ${config.NODE_ENV}`);
-    console.log(`   USERS_ROOT: ${config.USERS_ROOT}`);
+    logger.info(`DashboardEconomic listening on http://localhost:${PORT}`);
+    logger.info(`env=${config.NODE_ENV}  users_root=${config.USERS_ROOT}`);
 
     // If there is a last-used user, switch to their DB and run migrations.
     // Otherwise run migrations on the default DB so the schema is always current.
@@ -73,11 +73,11 @@ app.listen(PORT, async () => {
         if (lastUser) {
             const paths = ensureUserFolders(lastUser);
             await db.__setDbPath(paths.dbPath);
-            console.log(`   Resuming as user: ${lastUser}`);
+            logger.info(`Resuming session for user: ${lastUser}`);
         }
         await runMigrations();
     } catch (err) {
-        console.error('❌ Error en migraciones al arrancar:', err.message);
+        logger.error('Startup migration failed:', err.message);
     }
 });
 

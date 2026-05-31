@@ -291,12 +291,15 @@ async function _renderEvolutionChart(period) {
     if (loadEl) loadEl.style.display = 'flex';
 
     try {
-        // Fetch cached history per position in parallel
+        // Use ALL tickers ever traded (including closed positions) so historical P&L is accurate
+        const allTickers = [...new Set(_inv.operaciones.map(o => o.ticker).filter(Boolean))];
+
+        // Fetch cached history per ticker in parallel
         const historias = {};
-        await Promise.all(_inv.posiciones.map(async pos => {
+        await Promise.all(allTickers.map(async ticker => {
             try {
-                const r = await fetch(`/bolsa/ticker-history/${encodeURIComponent(pos.ticker)}`);
-                if (r.ok) { const j = await r.json(); historias[pos.ticker] = j.data || []; }
+                const r = await fetch(`/bolsa/ticker-history/${encodeURIComponent(ticker)}`);
+                if (r.ok) { const j = await r.json(); historias[ticker] = j.data || []; }
             } catch (_) {}
         }));
 
@@ -331,21 +334,19 @@ async function _renderEvolutionChart(period) {
             return last;
         }
 
-        // Build per-ticker shares-held map keyed by date, using operations
-        // sharesAtDate[ticker][date] = shares held at end of that day
+        // Build per-ticker shares-held map from ALL operations (including closed positions)
         const sharesAtDate = {};
-        for (const pos of _inv.posiciones) {
+        for (const ticker of allTickers) {
             const ops = _inv.operaciones
-                .filter(o => o.ticker === pos.ticker)
+                .filter(o => o.ticker === ticker)
                 .sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
-            // Build a sorted list of (date, cumulative shares)
             let cum = 0;
             const changes = [];
             for (const o of ops) {
                 cum += o.tipo === 'compra' ? o.cantidad : -o.cantidad;
                 changes.push({ fecha: o.fecha, shares: Math.max(0, cum) });
             }
-            sharesAtDate[pos.ticker] = changes;
+            sharesAtDate[ticker] = changes;
         }
         function getSharesAt(ticker, date) {
             const changes = sharesAtDate[ticker] || [];
@@ -378,10 +379,10 @@ async function _renderEvolutionChart(period) {
             if (!invested || invested <= 0) { seriesEur.push(null); seriesPct.push(null); continue; }
             let portfolioVal = 0;
             let found = false;
-            for (const pos of _inv.posiciones) {
-                const shares = getSharesAt(pos.ticker, date);
+            for (const ticker of allTickers) {
+                const shares = getSharesAt(ticker, date);
                 if (shares <= 0) continue;
-                const p = getPriceFill(pos.ticker, date);
+                const p = getPriceFill(ticker, date);
                 if (p != null) { portfolioVal += p * shares; found = true; }
             }
             if (!found) { seriesEur.push(null); seriesPct.push(null); continue; }

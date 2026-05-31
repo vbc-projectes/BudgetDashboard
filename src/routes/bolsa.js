@@ -7,6 +7,7 @@
 const express = require('express');
 const BolsaService = require('../services/BolsaService');
 const yahooFinanceService = require('../services/yahooFinanceService');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 const bolsaService = new BolsaService();
@@ -25,7 +26,7 @@ function fetchAndCacheHistory(ticker) {
                     bolsaService.cacheTickerHistory(norm, result.data);
                 }
             })
-            .catch(err => { console.warn(`⚠️ fetchAndCacheHistory [${norm}]:`, err.message ?? err); });
+            .catch(err => { logger.warn(`fetchAndCacheHistory [${norm}]:`, err.message ?? err); });
     }).catch(() => {});
 }
 

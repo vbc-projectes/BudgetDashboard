@@ -41,9 +41,11 @@ function timeoutMiddleware(req, res, next) {
  * Middleware de manejo de errores global
  */
 function errorHandler(err, req, res, next) {
-    console.error('❌ Error:', err);
+    const logger = require('../utils/logger');
+    logger.error(`${req.method} ${req.path} — ${err.message}`);
+    if (config.NODE_ENV !== 'production') logger.debug(err.stack);
     res.status(500).json({ 
-        error: err.message || 'Error interno del servidor',
+        error: err.message || 'Internal server error',
         details: config.NODE_ENV === 'development' ? err.stack : undefined
     });
 }

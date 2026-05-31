@@ -8,6 +8,7 @@ const path = require('path');
 const db = require('../config/database');
 const { dbRun, dbGet, dbAll } = require('../utils/dbHelpers');
 const { calcularInteresGenerado, generarDescripcionRandom } = require('../utils/calculations');
+const logger = require('../utils/logger');
 const { runMigrations } = require('../database/migrationRunner');
 const {
     normalizeUserName,
@@ -133,7 +134,7 @@ async function importBatchWithTransaction(service, datos) {
         try {
             await dbRun(db, 'ROLLBACK');
         } catch (rollbackError) {
-            console.warn('No se pudo revertir la transacción de importación:', rollbackError.message);
+            logger.warn('import rollback failed:', rollbackError.message);
         }
 
         return {
@@ -159,7 +160,7 @@ function registerIpcHandlers() {
         try {
             return await fn(...args);
         } catch (err) {
-            console.error(`❌ IPC [${channel}]:`, err.message ?? err);
+            logger.error(`IPC [${channel}]:`, err.message ?? err);
             throw err;
         }
     });
@@ -171,7 +172,7 @@ function registerIpcHandlers() {
             if ('resumenCacheTime' in dashboardService) dashboardService.resumenCacheTime = 0;
             if ('resumenCacheKey' in dashboardService) dashboardService.resumenCacheKey = null;
         } catch (e) {
-            console.warn('No se pudo limpiar caché de dashboardService:', e.message);
+            logger.warn('could not clear dashboardService cache:', e.message);
         }
     // ============= USUARIOS =============
 
@@ -744,7 +745,7 @@ function registerIpcHandlers() {
         try {
             return await yahooFinanceService.getAssetPrice(safeTicker);
         } catch (err) {
-            console.warn(`⚠️ get-asset-price sin datos para ${safeTicker}: ${err.message}`);
+            logger.warn(`get-asset-price no data for ${safeTicker}: ${err.message}`);
             return { ticker: safeTicker, currentPrice: null, currency: 'EUR', unavailable: true };
         }
     });
@@ -755,7 +756,7 @@ function registerIpcHandlers() {
         try {
             return await yahooFinanceService.getHistoricalData(safeTicker, safePeriod);
         } catch (err) {
-            console.warn(`WARN get-asset-history sin datos para ${safeTicker} (${safePeriod}): ${err.message}`);
+            logger.warn(`get-asset-history no data for ${safeTicker} (${safePeriod}): ${err.message}`);
             return {
                 ticker: safeTicker,
                 period: safePeriod,
@@ -859,16 +860,16 @@ function registerIpcHandlers() {
                 };
             }).sort((a, b) => new Date(b.fechaGuardado) - new Date(a.fechaGuardado));
             
-            console.log(`📋 Se listaron ${lista.length} archivos guardados`);
+            logger.debug(`import-list: ${lista.length} files`);
             return { success: true, archivos: lista };
         } catch (error) {
-            console.error('❌ Error listando archivos:', error);
+            logger.error('import-list failed:', error.message ?? error);
             throw error;
         }
     });
 
     safeHandle('import-content', async (event, id) => {
-        console.log('📖 import-content llamado con id:', id, 'tipo:', typeof id);
+        logger.debug('import-content called, id:', id);
         
         // Asegurar que id es un string
         const idStr = String(id);
@@ -890,12 +891,12 @@ function registerIpcHandlers() {
             nombreSinTimestamp = idStr.substring(timestamp.toString().length + 1);
         }
         
-        console.log('✅ Contenido del archivo enviado:', idStr);
+        logger.debug('import-content served:', idStr);
         return { success: true, nombre: nombreSinTimestamp, contenido };
     });
 
     safeHandle('import-delete', async (event, id) => {
-        console.log('🗑️ import-delete llamado con id:', id, 'tipo:', typeof id);
+        logger.debug('import-delete called, id:', id);
         
         // Asegurar que id es un string
         const idStr = String(id);
@@ -906,7 +907,7 @@ function registerIpcHandlers() {
         }
         
         fs.unlinkSync(rutaArchivo);
-        console.log('✅ Archivo eliminado:', idStr);
+        logger.debug('import-delete done:', idStr);
         return { success: true };
     });
 
@@ -932,7 +933,7 @@ function registerIpcHandlers() {
         // Guardar archivo físico
         const buffer = Buffer.from(contenido, 'base64');
         fs.writeFileSync(filePath, buffer);
-        console.log(`💾 Archivo guardado físicamente: ${uniqueFilename}`);
+        logger.debug(`import-save stored: ${uniqueFilename}`);
         
         return { success: true, message: 'Archivo guardado correctamente', filename: uniqueFilename };
     });
@@ -1022,7 +1023,7 @@ function registerIpcHandlers() {
         return { success: true, stats: result.stats, totalAdded: result.totalAdded, totalUpdated: result.totalUpdated };
     });
 
-    console.log('✅ IPC Handlers registrados');
+    logger.info('IPC handlers registered');
 }
 
 module.exports = { registerIpcHandlers };

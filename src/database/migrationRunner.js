@@ -1,5 +1,6 @@
 const db = require('../config/database');
 const { dbRun, dbGet, dbAll } = require('../utils/dbHelpers');
+const logger = require('../utils/logger');
 const fs = require('fs');
 const path = require('path');
 
@@ -64,7 +65,7 @@ function getAvailableMigrations() {
  * Ejecuta las migraciones pendientes
  */
 async function runMigrations() {
-    console.log('🔄 Verificando migraciones...');
+    logger.info('Checking migrations...');
     
     await initMigrationsTable();
     
@@ -76,20 +77,20 @@ async function runMigrations() {
     );
 
     if (pendingMigrations.length === 0) {
-        console.log('✅ Todas las migraciones están actualizadas');
+        logger.info('Database schema is up to date');
         return;
     }
 
-    console.log(`📦 Ejecutando ${pendingMigrations.length} migración(es) pendiente(s)...`);
+    logger.info(`Applying ${pendingMigrations.length} pending migration(s)...`);
 
     for (const migration of pendingMigrations) {
         try {
-            console.log(`   Ejecutando: ${migration.version}_${migration.name}...`);
+            logger.info(`  Applying: ${migration.version}_${migration.name}`);
             
             const migrationModule = require(migration.path);
             
             if (typeof migrationModule.up !== 'function') {
-                throw new Error(`Migración ${migration.filename} no tiene función 'up'`);
+                throw new Error(`Migration ${migration.filename} missing 'up' function`);
             }
 
             await dbRun(db, 'BEGIN');
@@ -102,14 +103,14 @@ async function runMigrations() {
                 throw innerErr;
             }
             
-            console.log(`   ✅ Completada: ${migration.version}_${migration.name}`);
+            logger.info(`  Done:     ${migration.version}_${migration.name}`);
         } catch (err) {
-            console.error(`   ❌ Error en migración ${migration.filename}:`, err.message);
+            logger.error(`  Failed:   ${migration.filename}:`, err.message);
             throw err;
         }
     }
 
-    console.log('✅ Todas las migraciones se ejecutaron correctamente');
+    logger.info('All migrations applied successfully');
 }
 
 module.exports = { runMigrations, getAvailableMigrations, getExecutedMigrations };

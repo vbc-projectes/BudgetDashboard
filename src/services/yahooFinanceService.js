@@ -1,6 +1,7 @@
 // fetch nativo en Node.js 18+ (no necesita polyfill)
 const YahooFinance = require('yahoo-finance2').default;
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
+const logger = require('../utils/logger');
 
 // Caché de tasa de cambio USD->EUR (se actualiza cada hora)
 let exchangeRate = 0.92;
@@ -316,7 +317,7 @@ async function fetchStooqQuote(ticker) {
             };
         } catch (error) {
             if (shouldLogTickerFailure(candidate.stooqSymbol)) {
-                console.log(`INFO ${candidate.stooqSymbol} no disponible en stooq: ${error.message}`);
+                logger.debug(`stooq unavailable for ${candidate.stooqSymbol}: ${error.message}`);
             }
         }
     }
@@ -380,7 +381,7 @@ async function fetchStooqHistorical(ticker, startDate, endDate) {
             }
         } catch (error) {
             if (shouldLogTickerFailure(candidate.stooqSymbol)) {
-                console.log(`INFO historico ${candidate.stooqSymbol} falló en stooq: ${error.message}`);
+                logger.debug(`stooq history failed for ${candidate.stooqSymbol}: ${error.message}`);
             }
         }
     }
@@ -423,7 +424,7 @@ async function quoteFirstAvailablePrice(ticker) {
             const isInfrastructureError = looksLikeProviderInfrastructureError(e);
             hadInfrastructureError = hadInfrastructureError || isInfrastructureError;
             if (shouldLogTickerFailure(candidate)) {
-                console.log(`INFO ${candidate} no disponible: ${e.message}`);
+                logger.debug(`yahoo quote unavailable for ${candidate}: ${e.message}`);
             }
             // Si Yahoo está caído por consentimiento/redirección, no tiene sentido seguir probando sufijos.
             if (isInfrastructureError) {
@@ -435,9 +436,9 @@ async function quoteFirstAvailablePrice(ticker) {
     const stooqQuote = await fetchStooqQuote(ticker);
     if (stooqQuote) {
         if (hadInfrastructureError) {
-            console.warn(`WARN proveedor Yahoo no disponible para ${ticker}; usando stooq como respaldo`);
+            logger.warn(`yahoo provider unavailable for ${ticker}; falling back to stooq`);
         } else {
-            console.log(`INFO Yahoo sin datos para ${ticker}; usando stooq como respaldo`);
+            logger.debug(`yahoo has no data for ${ticker}; falling back to stooq`);
         }
         return stooqQuote;
     }
@@ -524,11 +525,11 @@ async function obtenerTasaCambio() {
                 exchangeRate = rate;
                 exchangeRateTime = ahora;
             }
-            console.log(`✅ Tasa de cambio actualizada: 1 ${normalizedBase} = ${rate} ${normalizedTarget}`);
+            logger.info(`FX rate updated: 1 ${normalizedBase} = ${rate} ${normalizedTarget}`);
             return rate;
         }
     } catch (e) {
-        console.warn(`⚠️ No se pudo obtener tasa ${normalizedBase}->${normalizedTarget} en tiempo real`);
+        logger.warn(`FX rate fetch failed for ${normalizedBase}->${normalizedTarget}: ${e.message}`);
     }
 
     if (cacheKey === 'USD->EUR') {
@@ -577,7 +578,7 @@ async function getAssetPrice(ticker) {
     if (!resolved) {
         const staleCache = getAnyCacheEntry(priceCache, priceCacheKey);
         if (staleCache) {
-            console.warn(`⚠️ Usando caché de precio para ${normalizedTicker} por fallo de proveedor`);
+            logger.warn(`using stale price cache for ${normalizedTicker} (provider failure)`);
             return addCacheMetadata(
                 staleCache.value,
                 staleCache,
@@ -593,7 +594,7 @@ async function getAssetPrice(ticker) {
     if (!Number.isFinite(priceEUR) || priceEUR <= 0) {
         const staleCache = getAnyCacheEntry(priceCache, priceCacheKey);
         if (staleCache) {
-            console.warn(`⚠️ Usando caché de precio para ${normalizedTicker} por fallo de conversión`);
+            logger.warn(`using stale price cache for ${normalizedTicker} (conversion failure)`);
             return addCacheMetadata(
                 staleCache.value,
                 staleCache,
@@ -605,7 +606,7 @@ async function getAssetPrice(ticker) {
     }
 
     if (resolved.candidate !== normalizedTicker) {
-        console.log(`🔁 Ticker resuelto ${normalizedTicker} -> ${resolved.candidate}`);
+        logger.debug(`ticker resolved: ${normalizedTicker} -> ${resolved.candidate}`);
     }
 
     const payload = {
@@ -655,7 +656,7 @@ async function getHistoricalData(ticker, period = '1y') {
 
 async function _doFetchHistoricalData(normalizedTicker, period, historyCacheKey) {
 
-    console.log(`📊 [getHistoricalData] Ticker: ${normalizedTicker}, Período: ${period}`);
+    logger.debug(`getHistoricalData ticker=${normalizedTicker} period=${period}`);
     
     try {
         // Calcular fechas basadas en el período
@@ -684,7 +685,7 @@ async function _doFetchHistoricalData(normalizedTicker, period, historyCacheKey)
                 break;
         }
         
-        console.log(`📅 Desde: ${startDate.toISOString().split('T')[0]} Hasta: ${endDate.toISOString().split('T')[0]}`);
+        logger.debug(`  date range: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
         
         const queryOptions = {
             period1: startDate,
@@ -711,7 +712,7 @@ async function _doFetchHistoricalData(normalizedTicker, period, historyCacheKey)
                 result = direct.data;
                 finalTicker = direct.candidate;
                 inferredCurrency = direct.currency;
-                console.log(`✅ Histórico directo encontrado con ${candidate} (${direct.data.length} puntos)`);
+                logger.debug(`  history found via direct API: ${candidate} (${direct.data.length} points)`);
                 break;
             }
         }
@@ -720,19 +721,19 @@ async function _doFetchHistoricalData(normalizedTicker, period, historyCacheKey)
         if (!result) {
         for (const candidate of yahooCandidates) {
             try {
-                console.log(`🔍 Intentando histórico con: ${candidate}`);
+                logger.debug(`  trying yahoo-finance2 history: ${candidate}`);
                 const historical = await yahooFinance.historical(candidate, queryOptions);
                 if (Array.isArray(historical) && historical.length > 0) {
                     result = historical;
                     finalTicker = candidate;
-                    console.log(`✅ Datos encontrados con ${candidate}`);
+                    logger.debug(`  history found via yahoo-finance2: ${candidate}`);
                     break;
                 }
             } catch (e) {
                 const isInfrastructureError = looksLikeProviderInfrastructureError(e);
                 hadInfrastructureError = hadInfrastructureError || isInfrastructureError;
                 if (shouldLogTickerFailure(candidate)) {
-                    console.log(`⚠️ Histórico ${candidate} falló: ${e.message}`);
+                    logger.debug(`  yahoo history failed for ${candidate}: ${e.message}`);
                 }
                 // Si Yahoo está caído por consentimiento/redirección, saltar a fallback sin ruido.
                 if (isInfrastructureError) {
@@ -749,19 +750,19 @@ async function _doFetchHistoricalData(normalizedTicker, period, historyCacheKey)
                 finalTicker = stooqHistorical.candidate;
                 inferredCurrency = stooqHistorical.currency;
                 if (hadInfrastructureError) {
-                    console.warn(`⚠️ Histórico de Yahoo no disponible para ${normalizedTicker}; usando stooq como respaldo`);
+                    logger.warn(`yahoo history unavailable for ${normalizedTicker}; falling back to stooq`);
                 } else {
-                    console.log(`INFO Histórico sin datos en Yahoo para ${normalizedTicker}; usando stooq como respaldo`);
+                    logger.debug(`yahoo has no history for ${normalizedTicker}; falling back to stooq`);
                 }
             }
         }
 
         if (!result || !Array.isArray(result) || result.length === 0) {
-            console.error(`❌ No se encontraron datos históricos para ${normalizedTicker}`);
+            logger.error(`no historical data found for ${normalizedTicker}`);
             throw new Error(`No se encontraron datos históricos. Verifica que el ticker "${normalizedTicker}" sea correcto (ej: AAPL, MSFT, GOOGL)`);
         }
 
-        console.log(`✅ ${result.length} puntos de datos obtenidos para ${finalTicker}`);
+        logger.debug(`  ${result.length} data points for ${finalTicker}`);
 
         // Obtener la moneda del ticker
         let currency = inferredCurrency || 'USD';
@@ -770,7 +771,7 @@ async function _doFetchHistoricalData(normalizedTicker, period, historyCacheKey)
                 const quote = await yahooFinance.quote(finalTicker);
                 currency = quote?.currency || 'USD';
             } catch (e) {
-                console.warn(`⚠️ No se pudo obtener moneda: ${e.message}`);
+                logger.warn(`could not fetch currency for ${finalTicker}: ${e.message}`);
             }
         }
 
@@ -794,7 +795,7 @@ async function _doFetchHistoricalData(normalizedTicker, period, historyCacheKey)
                 };
             });
 
-        console.log(`✅ ${historicalData.length} puntos formateados`);
+        logger.debug(`  ${historicalData.length} formatted data points`);
 
         const payload = {
             ticker: finalTicker,
@@ -808,7 +809,7 @@ async function _doFetchHistoricalData(normalizedTicker, period, historyCacheKey)
     } catch (error) {
         const staleCache = getAnyCacheEntry(historicalCache, historyCacheKey);
         if (staleCache) {
-            console.warn(`⚠️ Usando caché histórico para ${normalizedTicker} (${period}) por fallo de proveedor`);
+            logger.warn(`using stale history cache for ${normalizedTicker} (${period}) (provider failure)`);
             return addCacheMetadata(
                 staleCache.value,
                 staleCache,
@@ -817,7 +818,7 @@ async function _doFetchHistoricalData(normalizedTicker, period, historyCacheKey)
             );
         }
 
-        console.error(`❌ Error obteniendo datos históricos para ${normalizedTicker}:`, error.message);
+        logger.error(`getHistoricalData failed for ${normalizedTicker}:`, error.message);
         throw error;
     }
 }
