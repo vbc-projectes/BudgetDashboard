@@ -279,7 +279,7 @@ async function _renderEvolutionChart(period) {
     const labelEl  = document.getElementById('invEvolLabel');
     if (!canvas) return;
 
-    if (!_inv.posiciones.length) {
+    if (!_inv.operaciones.length) {
         canvas.style.display = 'none';
         if (loadEl)  { loadEl.style.display  = 'none'; }
         if (emptyEl) { emptyEl.style.display = 'flex'; }
@@ -365,7 +365,11 @@ async function _renderEvolutionChart(period) {
         for (const date of sortedDates) {
             while (opPtr < allOps.length && allOps[opPtr].fecha <= date) {
                 const o = allOps[opPtr++];
-                const cashFlow = o.cantidad * o.precio_unitario + (o.comision || 0);
+                // Buy:  cash out = precio × cant + comisión
+                // Sell: cash in  = precio × cant − comisión  (net proceeds)
+                const cashFlow = o.tipo === 'compra'
+                    ? o.cantidad * o.precio_unitario + (o.comision || 0)
+                    : o.cantidad * o.precio_unitario - (o.comision || 0);
                 cumulInvested += o.tipo === 'compra' ? cashFlow : -cashFlow;
             }
             investedByDate[date] = cumulInvested;
@@ -376,7 +380,10 @@ async function _renderEvolutionChart(period) {
         const seriesPct = [];
         for (const date of sortedDates) {
             const invested = investedByDate[date];
-            if (!invested || invested <= 0) { seriesEur.push(null); seriesPct.push(null); continue; }
+            // Skip dates before the first operation (nothing deployed yet)
+            if (invested == null || (invested === 0 && !seriesEur.some(v => v !== null))) {
+                seriesEur.push(null); seriesPct.push(null); continue;
+            }
             let portfolioVal = 0;
             let found = false;
             for (const ticker of allTickers) {
@@ -385,10 +392,12 @@ async function _renderEvolutionChart(period) {
                 const p = getPriceFill(ticker, date);
                 if (p != null) { portfolioVal += p * shares; found = true; }
             }
-            if (!found) { seriesEur.push(null); seriesPct.push(null); continue; }
+            // If invested <= 0 (fully exited with profit) portfolioVal is 0 but pnl = -invested > 0
+            if (!found && invested > 0) { seriesEur.push(null); seriesPct.push(null); continue; }
             const pnl = portfolioVal - invested;
             seriesEur.push(parseFloat(pnl.toFixed(2)));
-            seriesPct.push(parseFloat((pnl / invested * 100).toFixed(4)));
+            // % only meaningful when invested > 0; otherwise show null on % axis
+            seriesPct.push(invested > 0 ? parseFloat((pnl / invested * 100).toFixed(4)) : null);
         }
 
         // Trim leading nulls

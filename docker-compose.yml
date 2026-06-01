@@ -22,6 +22,8 @@ services:
       NODE_ENV: production
       PORT: 3000
       USERS_ROOT: /app/usuarios
+      # LOG_LEVEL: debug  # uncomment for verbose output (info|warn|error|debug)
+      LOG_LEVEL: info
       # CAMBIAR: limita las filas devueltas por consulta si el server tiene poca RAM
       QUERY_LIMIT: 2000
       # CAMBIAR: pon el dominio o IP pública del server (ej: https://mi-dominio.com)
