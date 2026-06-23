@@ -9,6 +9,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const crypto = require('crypto');
 const db = require('../config/database');
 const { dbRun } = require('../utils/dbHelpers');
 const PuntualService = require('../services/PuntualService');
@@ -57,12 +58,22 @@ const upload = multer({
     }
 });
 
+function computeHash(item) {
+    const str = [
+        String(item.fecha || ''),
+        String(parseFloat(item.monto || 0).toFixed(2)),
+        String(item.descripcion || '').trim().toLowerCase()
+    ].join('|');
+    return crypto.createHash('sha256').update(str).digest('hex');
+}
+
 // ── Batch import helper (matches ipcHandlers logic) ──────────────────
-async function importBatch(service, datos) {
+async function importBatch(service, datos, { checkDedup = false, tableName = null } = {}) {
     if (!Array.isArray(datos) || datos.length === 0) {
         throw new Error('No hay datos para importar');
     }
     const resultados = [];
+    const duplicados = [];
     let exitosos = 0;
     let fallidos = 0;
 
@@ -70,6 +81,15 @@ async function importBatch(service, datos) {
     try {
         for (const item of datos) {
             try {
+                if (checkDedup && tableName) {
+                    const hash = computeHash(item);
+                    const existing = db.prepare(`SELECT id FROM ${tableName} WHERE hash_dedup = ?`).get(hash);
+                    if (existing) {
+                        duplicados.push({ ...item, duplicado: true, id_existente: existing.id });
+                        continue;
+                    }
+                    item.hash_dedup = hash;
+                }
                 await service.add(item);
                 resultados.push({ ...item, ok: true });
                 exitosos++;
@@ -82,9 +102,9 @@ async function importBatch(service, datos) {
         await dbRun(db, 'COMMIT');
     } catch (err) {
         try { await dbRun(db, 'ROLLBACK'); } catch (_) {}
-        return { success: false, total: datos.length, exitosos, fallidos: fallidos || datos.length - exitosos, error: err.message, detalles: resultados };
+        return { success: false, total: datos.length, exitosos, fallidos: fallidos || datos.length - exitosos, error: err.message, detalles: resultados, duplicados };
     }
-    return { success: true, total: datos.length, exitosos, fallidos, detalles: resultados };
+    return { success: true, total: datos.length, exitosos, fallidos, detalles: resultados, duplicados };
 }
 
 // ── Routes ────────────────────────────────────────────────────────────
@@ -173,11 +193,11 @@ router.post('/import/ingreso_puntual', async (req, res, next) => {
 });
 
 router.post('/import/gasto_real', async (req, res, next) => {
-    try { res.json(await importBatch(gastosRealesService, req.body?.datos)); } catch (err) { next(err); }
+    try { res.json(await importBatch(gastosRealesService, req.body?.datos, { checkDedup: true, tableName: 'gastos_reales' })); } catch (err) { next(err); }
 });
 
 router.post('/import/ingreso_real', async (req, res, next) => {
-    try { res.json(await importBatch(ingresosRealesService, req.body?.datos)); } catch (err) { next(err); }
+    try { res.json(await importBatch(ingresosRealesService, req.body?.datos, { checkDedup: true, tableName: 'ingresos_reales' })); } catch (err) { next(err); }
 });
 
 module.exports = router;

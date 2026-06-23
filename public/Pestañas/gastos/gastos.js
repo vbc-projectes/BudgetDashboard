@@ -26,7 +26,7 @@ function cargarGastosForm() {
             mensuales: '#categoriaMensual'
         },
         customColumns: {
-            mensual: ['desde', 'hasta', 'descripcion', 'monto', 'ipc_porcentaje', 'monto_ajustado', 'categoria']
+            mensual: ['desde', 'hasta', 'descripcion', 'monto', 'ipc_porcentaje', 'monto_ajustado', 'categoria', 'notas']
         },
         showOldFlag: 'showOldGastos'
     });
@@ -73,6 +73,8 @@ function cargarGastosForm() {
         if (!desc) return showAlert(gastosManager.t('gastos.ingresaDescripcion', "Ingresa una descripción"));
         if (isNaN(monto) || monto <= 0) return showAlert(gastosManager.t('gastos.montoInvalido', "Monto inválido"));
 
+        const notas = document.getElementById('notasGasto')?.value?.trim() || null;
+
         // Si no se fracciona, enviar una sola entrada
         if (!fraccionar || partes <= 1) {
             await fetch('/add/gasto_puntual', {
@@ -82,7 +84,8 @@ function cargarGastosForm() {
                     fecha: fecha,
                     descripcion: desc,
                     monto: monto,
-                    categoria_id: selectCatP.value
+                    categoria_id: selectCatP.value,
+                    notas
                 })
             });
         } else {
@@ -126,6 +129,7 @@ function cargarGastosForm() {
         document.getElementById('fechaGasto').value = '';
         document.getElementById('descGasto').value = '';
         document.getElementById('montoGasto').value = '';
+        if (document.getElementById('notasGasto')) document.getElementById('notasGasto').value = '';
         const chk = document.getElementById('fraccionarGasto');
         if (chk) {
             chk.checked = false;
@@ -135,11 +139,27 @@ function cargarGastosForm() {
         if (partsInput) partsInput.value = '2';
         
         gastosManager.loadData();
+        if (typeof window.gastoCalendarRefresh === 'function') window.gastoCalendarRefresh();
         if (typeof cargarResumenPeriodos === 'function') cargarResumenPeriodos();
         if (typeof notifySuccess === 'function') {
             notifySuccess(gastosManager.t('mensajes.elementoCreado', 'Gasto guardado'));
         }
+        checkSpendingLimit(selectCatP);
     };
+
+    async function checkSpendingLimit(selectEl) {
+        try {
+            const mes = new Date().toISOString().slice(0, 7);
+            const res = await fetch('/dashboard/presupuestos?mes=' + mes);
+            if (!res.ok) return;
+            const data = await res.json();
+            const catName = selectEl?.options[selectEl.selectedIndex]?.textContent;
+            const presup = Array.isArray(data) ? data.find(p => p.categoria === catName) : null;
+            if (presup && presup.superado && typeof notifyInfo === 'function') {
+                notifyInfo('⚠️ Límite de presupuesto superado en: ' + catName);
+            }
+        } catch (_) {}
+    }
 
     // ===== LÓGICA ESPECÍFICA: AGREGAR GASTO REAL =====
     document.getElementById('btnAgregarGastoReal').onclick = async () => {
@@ -169,6 +189,7 @@ function cargarGastosForm() {
         document.getElementById('montoGastoReal').value = '';
 
         gastosRealesManager.loadData();
+        if (typeof window.gastoCalendarRefresh === 'function') window.gastoCalendarRefresh();
         if (typeof cargarResumenPeriodos === 'function') cargarResumenPeriodos();
         if (typeof notifySuccess === 'function') {
             notifySuccess(gastosRealesManager.t('mensajes.elementoCreado', 'Gasto real guardado'));
@@ -194,6 +215,7 @@ function cargarGastosForm() {
         if (isNaN(monto) || monto <= 0) return showAlert(gastosManager.t('gastos.montoInvalido', "Monto inválido"));
         if (!categoria) return showAlert(gastosManager.t('gastos.seleccionaCategoria', "Selecciona una categoría"));
 
+        const notasMensual = document.getElementById('notasMensual')?.value?.trim() || null;
         await fetch('/add/gasto_mensual', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -203,7 +225,8 @@ function cargarGastosForm() {
                 categoria_id: categoria,
                 desde: desde,
                 hasta: hasta,
-                ipc_porcentaje: ipcValue
+                ipc_porcentaje: ipcValue,
+                notas: notasMensual
             })
         });
 
@@ -214,8 +237,10 @@ function cargarGastosForm() {
         document.getElementById('montoMensual').value = '';
         const ipcMensualInput = document.getElementById('ipcMensual');
         if (ipcMensualInput) ipcMensualInput.value = '';
+        if (document.getElementById('notasMensual')) document.getElementById('notasMensual').value = '';
         
         gastosManager.loadData();
+        if (typeof window.gastoCalendarRefresh === 'function') window.gastoCalendarRefresh();
         if (typeof cargarResumenPeriodos === 'function') cargarResumenPeriodos();
         if (typeof notifySuccess === 'function') {
             notifySuccess(gastosManager.t('mensajes.elementoCreado', 'Gasto mensual guardado'));
@@ -328,6 +353,11 @@ function cargarGastosForm() {
             setVisible(!!chkFraccionar.checked);
             if (!chkFraccionar.checked) inputPartes.value = '2';
         });
+    }
+
+    // ===== CALENDARIO =====
+    if (typeof initGastosCalendar === 'function') {
+        initGastosCalendar();
     }
 
     // ===== LISTENER PARA CAMBIOS DE IDIOMA =====

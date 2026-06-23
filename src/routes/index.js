@@ -37,6 +37,8 @@ router.use('/', require('./dashboard'));
 router.use('/', require('./users'));
 router.use('/', require('./importacion'));
 router.use('/', require('./bolsa'));
+router.use('/', require('./presupuestos'));
+router.use('/', require('./backup'));
 
 // ── Health / diagnostics ──────────────────────────────────────────────
 router.get('/api/health', (req, res) => {

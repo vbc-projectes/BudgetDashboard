@@ -641,31 +641,65 @@ async function getResumenPeriodos() {
         return total;
     };
 
-    const ingresosM = await dbAll(db, `SELECT monto, desde, hasta FROM ingresos_mensuales LIMIT 1000`);
-    const cuentasRemuneradas = await dbAll(db, `SELECT monto, aportacion_mensual, interes, retencion, desde, hasta FROM cuenta_remunerada LIMIT 1000`);
-    const gastosM = await dbAll(db, `SELECT monto, desde, hasta, ipc_porcentaje FROM gastos_mensuales LIMIT 1000`);
-    const ingresosMBruto = await dbAll(db, `SELECT bruto, monto, desde, hasta FROM ingresos_mensuales WHERE bruto IS NOT NULL AND bruto != monto LIMIT 1000`);
-    const impuestosMensuales = await dbAll(db, `SELECT monto, desde, hasta FROM impuestos_mensuales LIMIT 1000`);
+    const periodoEntries = Object.entries(periodos);
+    const hastaStr = hoy.toISOString().slice(0, 10);
+    const desdeStrs = periodoEntries.map(([, d]) => d.toISOString().slice(0, 10));
 
-    for(const [periodo, desde] of Object.entries(periodos)){
-        const hasta = hoy;
-        const desdeStr = desde.toISOString().slice(0,10);
-        const hastaStr = hasta.toISOString().slice(0,10);
+    // Construye una query con CASE WHEN para obtener sumas de todos los periodos en una sola pasada
+    const buildMultiPeriodSumQuery = (table) => {
+        const cases = desdeStrs.map((_, i) =>
+            `IFNULL(SUM(CASE WHEN fecha >= ? THEN monto ELSE 0 END),0) AS p${i}`
+        ).join(', ');
+        return { sql: `SELECT ${cases} FROM ${table} WHERE fecha <= ?`, params: [...desdeStrs, hastaStr] };
+    };
 
-        const ingresosP = (await dbAll(db, `SELECT IFNULL(SUM(monto),0) as total FROM ingresos_puntuales WHERE fecha BETWEEN ? AND ? LIMIT 1000`, [desdeStr, hastaStr]))[0]?.total || 0;
+    const qIngP = buildMultiPeriodSumQuery('ingresos_puntuales');
+    const qGasP = buildMultiPeriodSumQuery('gastos_puntuales');
+    const qImpP = buildMultiPeriodSumQuery('impuestos_puntuales');
+
+    // 8 queries en total (5 mensuales + 3 puntuales multi-periodo), en paralelo
+    const [
+        ingresosM,
+        cuentasRemuneradas,
+        gastosM,
+        ingresosMBruto,
+        impuestosMensuales,
+        ingPRow,
+        gasPRow,
+        impPRow,
+        ingPBrutoAll
+    ] = await Promise.all([
+        dbAll(db, `SELECT monto, desde, hasta FROM ingresos_mensuales LIMIT 1000`),
+        dbAll(db, `SELECT monto, aportacion_mensual, interes, retencion, desde, hasta FROM cuenta_remunerada LIMIT 1000`),
+        dbAll(db, `SELECT monto, desde, hasta, ipc_porcentaje FROM gastos_mensuales LIMIT 1000`),
+        dbAll(db, `SELECT bruto, monto, desde, hasta FROM ingresos_mensuales WHERE bruto IS NOT NULL AND bruto != monto LIMIT 1000`),
+        dbAll(db, `SELECT monto, desde, hasta FROM impuestos_mensuales LIMIT 1000`),
+        dbAll(db, qIngP.sql, qIngP.params),
+        dbAll(db, qGasP.sql, qGasP.params),
+        dbAll(db, qImpP.sql, qImpP.params),
+        dbAll(db, `SELECT fecha, bruto, monto FROM ingresos_puntuales WHERE fecha <= ? AND bruto IS NOT NULL AND bruto != monto LIMIT 1000`, [hastaStr])
+    ]);
+
+    // Pre-calcular intereses de cuentas remuneradas por mes (evita recalcular en cada periodo)
+    const crInteresesCache = cuentasRemuneradas.map(cr => ({
+        cr,
+        interesesMensuales: calcularInteresesMensuales(cr.monto, cr.aportacion_mensual || 0, cr.interes || 0, cr.desde, cr.hasta || hastaStr.slice(0, 7))
+    }));
+
+    for(let idx = 0; idx < periodoEntries.length; idx++){
+        const [periodo] = periodoEntries[idx];
+        const desdeStr = desdeStrs[idx];
+
+        const ingresosP = ingPRow[0]?.[`p${idx}`] || 0;
 
         let totalIngresosMensuales = 0;
         ingresosM.forEach(i => totalIngresosMensuales += i.monto * contarMesesDesde28(desdeStr, hastaStr, i.desde, i.hasta));
 
         let totalCuentaRemunerada = 0;
         let totalRetencionCR = 0;
-        cuentasRemuneradas.forEach(cr => {
-            // Calcular intereses mensuales generados para la cuenta
-            const interesesMensuales = calcularInteresesMensuales(cr.monto, cr.aportacion_mensual || 0, cr.interes || 0, cr.desde, cr.hasta || hastaStr.slice(0, 7));
-            // Sumar solo los intereses de los meses dentro del periodo
-            // Usar día 28 del mes (igual que esMensualActivo y contarMesesDesde28) para consistencia
-            const desdePeriodo = new Date(desdeStr);
-            const hastaPeriodo = new Date(hastaStr);
+        const desdePeriodo = new Date(desdeStr);
+        const hastaPeriodo = new Date(hastaStr);
+        crInteresesCache.forEach(({ cr, interesesMensuales }) => {
             Object.entries(interesesMensuales).forEach(([mes, interes]) => {
                 const fechaMes28 = new Date(mes + '-28');
                 if (fechaMes28 >= desdePeriodo && fechaMes28 <= hastaPeriodo) {
@@ -677,10 +711,11 @@ async function getResumenPeriodos() {
             });
         });
 
-
-        const ingresosPBruto = await dbAll(db, `SELECT bruto, monto FROM ingresos_puntuales WHERE fecha BETWEEN ? AND ? AND bruto IS NOT NULL AND bruto != monto LIMIT 1000`, [desdeStr, hastaStr]);
+        // Filtrar en JS los registros brutos del periodo (sin nueva query a la BD)
         let totalImpuestosPuntuales = 0;
-        ingresosPBruto.forEach(i => totalImpuestosPuntuales += i.bruto - i.monto);
+        ingPBrutoAll.forEach(i => {
+            if (i.fecha >= desdeStr && i.fecha <= hastaStr) totalImpuestosPuntuales += i.bruto - i.monto;
+        });
 
         let totalImpuestosMensuales = 0;
         ingresosMBruto.forEach(i => {
@@ -688,12 +723,10 @@ async function getResumenPeriodos() {
             totalImpuestosMensuales += (i.bruto - i.monto) * meses;
         });
 
-        // Calcular ingresos brutos: netos + impuestos deducidos de ingresos
         const ingresosBruto = ingresosP + totalIngresosMensuales + totalImpuestosPuntuales + totalImpuestosMensuales;
-        // El total de ingresos debe ser bruto + intereses cuentas remuneradas
         const totalIngresos = ingresosBruto + totalCuentaRemunerada;
 
-        const gastosP = (await dbAll(db, `SELECT IFNULL(SUM(monto),0) as total FROM gastos_puntuales WHERE fecha BETWEEN ? AND ? LIMIT 1000`, [desdeStr, hastaStr]))[0]?.total || 0;
+        const gastosP = gasPRow[0]?.[`p${idx}`] || 0;
 
         let totalGastosMensuales = 0;
         gastosM.forEach(g => {
@@ -702,8 +735,8 @@ async function getResumenPeriodos() {
 
         const totalGastos = gastosP + totalGastosMensuales;
 
-        const impuestosPuntuales = (await dbAll(db, `SELECT IFNULL(SUM(monto),0) as total FROM impuestos_puntuales WHERE fecha BETWEEN ? AND ? LIMIT 1000`, [desdeStr, hastaStr]))[0]?.total || 0;
-        
+        const impuestosPuntuales = impPRow[0]?.[`p${idx}`] || 0;
+
         let totalImpuestosStandaloneMensuales = 0;
         impuestosMensuales.forEach(i => totalImpuestosStandaloneMensuales += i.monto * contarMesesDesde28(desdeStr, hastaStr, i.desde, i.hasta));
 
@@ -735,6 +768,185 @@ async function getResumenPeriodos() {
     return resultado;
 }
 
+async function getNetWorth() {
+    const hoy = new Date();
+    const hoyMes = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+
+    const [huchaRow, subHuchas, subHuchasPuntuales, crs, bolsaRow] = await Promise.all([
+        dbGet(db, `SELECT IFNULL(SUM(cantidad),0) AS total FROM hucha`),
+        dbAll(db, `SELECT id, aportacion_inicial, aportacion_mensual, desde, hasta FROM sub_huchas`),
+        dbAll(db, `SELECT sub_hucha_id, IFNULL(SUM(monto),0) AS total FROM sub_huchas_puntuales GROUP BY sub_hucha_id`),
+        dbAll(db, `SELECT monto, aportacion_mensual, interes, retencion, desde, hasta FROM cuenta_remunerada`),
+        dbGet(db, `
+            SELECT IFNULL(SUM(CASE WHEN tipo='compra' THEN cantidad*precio_unitario+comision ELSE -(cantidad*precio_unitario-comision) END),0) AS total
+            FROM operaciones_bolsa
+        `)
+    ]);
+
+    const puntualMap = {};
+    for (const p of subHuchasPuntuales) puntualMap[p.sub_hucha_id] = p.total;
+
+    let totalSubHuchas = 0;
+    for (const sh of subHuchas) {
+        const hasta = sh.hasta === '9999-12' ? hoyMes : sh.hasta;
+        const meses = contarMesesDesde28(sh.desde, hasta);
+        const saldo = (sh.aportacion_inicial || 0) + meses * (sh.aportacion_mensual || 0) + (puntualMap[sh.id] || 0);
+        totalSubHuchas += saldo;
+    }
+
+    let totalCR = 0;
+    for (const cr of crs) {
+        const hasta = cr.hasta === '9999-12' ? hoyMes : cr.hasta;
+        const intereses = calcularInteresesMensuales(cr.monto, cr.aportacion_mensual || 0, cr.interes || 0, cr.desde, hasta);
+        const totalIntereses = Object.values(intereses).reduce((s, v) => s + (v || 0), 0);
+        const netosIntereses = totalIntereses * (1 - (cr.retencion || 0) / 100);
+        totalCR += cr.monto + netosIntereses;
+    }
+
+    const totalHucha = huchaRow?.total || 0;
+    const totalBolsa = Math.max(0, bolsaRow?.total || 0);
+
+    return {
+        hucha:           Math.round(totalHucha      * 100) / 100,
+        subhuchas:       Math.round(totalSubHuchas  * 100) / 100,
+        cuenta_remunerada: Math.round(totalCR       * 100) / 100,
+        bolsa:           Math.round(totalBolsa      * 100) / 100,
+        total:           Math.round((totalHucha + totalSubHuchas + totalCR + totalBolsa) * 100) / 100
+    };
+}
+
+async function getPresupuestosConGasto(mes) {
+    const mesFiltro = mes || (() => {
+        const hoy = new Date();
+        return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+    })();
+    const desdeStr = `${mesFiltro}-01`;
+    const hastaStr = `${mesFiltro}-31`;
+
+    // presupuestos_categoria may not exist on DBs that haven't run M019 yet
+    let presupuestos;
+    try {
+        presupuestos = await dbAll(db, `
+            SELECT pc.id, pc.categoria_id, pc.limite_mensual, c.nombre AS categoria
+            FROM presupuestos_categoria pc
+            JOIN categorias c ON pc.categoria_id = c.id
+            ORDER BY c.nombre
+        `);
+    } catch (_) {
+        return [];
+    }
+
+    const [gastosPunt, gastosMens] = await Promise.all([
+        dbAll(db, `
+            SELECT categoria_id, IFNULL(SUM(monto),0) AS total
+            FROM gastos_puntuales WHERE fecha >= ? AND fecha <= ?
+            GROUP BY categoria_id
+        `, [desdeStr, hastaStr]),
+        dbAll(db, `
+            SELECT categoria_id, IFNULL(SUM(monto),0) AS total
+            FROM gastos_mensuales WHERE desde <= ? AND hasta >= ?
+            GROUP BY categoria_id
+        `, [mesFiltro, mesFiltro])
+    ]);
+
+    const gastoMap = {};
+    for (const g of gastosPunt) gastoMap[g.categoria_id] = (gastoMap[g.categoria_id] || 0) + g.total;
+    for (const g of gastosMens) gastoMap[g.categoria_id] = (gastoMap[g.categoria_id] || 0) + g.total;
+
+    return presupuestos.map(p => {
+        const gasto_real = Math.round((gastoMap[p.categoria_id] || 0) * 100) / 100;
+        const pct = p.limite_mensual > 0 ? Math.round(gasto_real / p.limite_mensual * 10000) / 100 : 0;
+        return {
+            id:             p.id,
+            categoria_id:   p.categoria_id,
+            categoria:      p.categoria,
+            limite_mensual: p.limite_mensual,
+            gasto_real,
+            porcentaje:     pct,
+            superado:       gasto_real > p.limite_mensual
+        };
+    });
+}
+
+async function getAnomalias(meses = 6) {
+    const hoy = new Date();
+    const hoyMes = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+    const hoyStr = hoy.toISOString().slice(0, 10);
+
+    // Meses de referencia (los N meses anteriores al actual)
+    const mesesRef = [];
+    for (let i = 1; i <= meses; i++) {
+        const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+        mesesRef.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    }
+    const desdeRef = `${mesesRef[mesesRef.length - 1]}-01`;
+    const hastaRef = `${mesesRef[0]}-31`;
+
+    const [puntRef, mensRef, puntActual, mensActual, categorias] = await Promise.all([
+        dbAll(db, `SELECT categoria_id, fecha, monto FROM gastos_puntuales WHERE fecha >= ? AND fecha <= ?`, [desdeRef, hastaRef]),
+        dbAll(db, `SELECT categoria_id, monto, desde, hasta FROM gastos_mensuales`),
+        dbAll(db, `SELECT categoria_id, IFNULL(SUM(monto),0) AS total FROM gastos_puntuales WHERE fecha >= ? AND fecha <= ? GROUP BY categoria_id`, [`${hoyMes}-01`, hoyStr]),
+        dbAll(db, `SELECT categoria_id, IFNULL(SUM(monto),0) AS total FROM gastos_mensuales WHERE desde <= ? AND hasta >= ? GROUP BY categoria_id`, [hoyMes, hoyMes]),
+        dbAll(db, `SELECT id, nombre FROM categorias`)
+    ]);
+
+    const catMap = {};
+    for (const c of categorias) catMap[c.id] = c.nombre;
+
+    // Calcular gasto por categoría por mes de referencia
+    const gastoByMesCat = {};
+    for (const g of puntRef) {
+        const mes = g.fecha.slice(0, 7);
+        if (!gastoByMesCat[mes]) gastoByMesCat[mes] = {};
+        gastoByMesCat[mes][g.categoria_id] = (gastoByMesCat[mes][g.categoria_id] || 0) + g.monto;
+    }
+    for (const g of mensRef) {
+        for (const mes of mesesRef) {
+            if (g.desde <= mes && g.hasta >= mes) {
+                if (!gastoByMesCat[mes]) gastoByMesCat[mes] = {};
+                gastoByMesCat[mes][g.categoria_id] = (gastoByMesCat[mes][g.categoria_id] || 0) + g.monto;
+            }
+        }
+    }
+
+    // Promedio por categoría sobre los meses de referencia
+    const promedios = {};
+    for (const mes of mesesRef) {
+        const byMes = gastoByMesCat[mes] || {};
+        for (const [catId, total] of Object.entries(byMes)) {
+            if (!promedios[catId]) promedios[catId] = { suma: 0, count: 0 };
+            promedios[catId].suma  += total;
+            promedios[catId].count += 1;
+        }
+    }
+
+    // Gasto actual por categoría
+    const gastoActual = {};
+    for (const g of puntActual)  gastoActual[g.categoria_id] = (gastoActual[g.categoria_id] || 0) + g.total;
+    for (const g of mensActual)  gastoActual[g.categoria_id] = (gastoActual[g.categoria_id] || 0) + g.total;
+
+    // Detectar anomalías (>50% sobre la media)
+    const anomalias = [];
+    for (const [catId, gasto] of Object.entries(gastoActual)) {
+        const p = promedios[catId];
+        if (!p || p.count === 0) continue;
+        const promedio = p.suma / p.count;
+        if (promedio <= 0) continue;
+        const desviacion_pct = ((gasto - promedio) / promedio) * 100;
+        if (desviacion_pct > 50) {
+            anomalias.push({
+                categoria_id:   parseInt(catId),
+                categoria:      catMap[catId] || `Cat ${catId}`,
+                gasto_actual:   Math.round(gasto * 100) / 100,
+                promedio_mensual: Math.round(promedio * 100) / 100,
+                desviacion_pct: Math.round(desviacion_pct * 100) / 100
+            });
+        }
+    }
+
+    return anomalias.sort((a, b) => b.desviacion_pct - a.desviacion_pct);
+}
+
 module.exports = {
     getDashboardData,
     getDashboardRealData,
@@ -747,5 +959,8 @@ module.exports = {
     getCategoriasPeriodoReal,
     getGastosCategoriaMes,
     getGastosCategoriaMesReal,
-    getResumenPeriodos
+    getResumenPeriodos,
+    getNetWorth,
+    getPresupuestosConGasto,
+    getAnomalias
 };

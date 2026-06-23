@@ -29,6 +29,7 @@
           <th data-i18n="formularios.monto">Monto</th>
           <th data-i18n="formularios.bruto">Bruto</th>
           <th data-i18n="formularios.categoria">Categoría</th>
+          <th data-i18n="tablas.notas">Notas</th>
           <th class="w-120" data-i18n="tablas.acciones">Acciones</th>
         </tr>
         <tr class="insert-row">
@@ -49,6 +50,7 @@
             </div>
           </td>
           <td><select id="categoriaIngresoPuntual"></select></td>
+          <td><input type="text" id="notasIngresoPuntual" placeholder="Notas (opc.)" style="width:120px;"></td>
           <td><button id="btnAgregarIngresoPuntual"><i class="fas fa-plus"></i></button></td>
         </tr>
       </thead>
@@ -75,6 +77,7 @@
           <th data-i18n="formularios.monto">Monto</th>
           <th data-i18n="formularios.bruto">Bruto</th>
           <th data-i18n="formularios.categoria">Categoría</th>
+          <th data-i18n="tablas.notas">Notas</th>
           <th class="w-120" data-i18n="tablas.acciones">Acciones</th>
         </tr>
         <tr class="insert-row">
@@ -102,6 +105,7 @@
             </div>
           </td>
           <td><select id="categoriaIngresoMensual"></select></td>
+          <td><input type="text" id="notasIngresoMensual" placeholder="Notas (opc.)" style="width:120px;"></td>
           <td><button id="btnAgregarIngresoMensual"><i class="fas fa-plus"></i></button></td>
         </tr>
       </thead>
@@ -278,7 +282,36 @@
       </div>
     </section>
 
-    <!-- Sección 2: Ajustes manuales de saldo -->
+    <!-- Sección 2: Historial tipos de interés -->
+    <section style="margin-bottom:28px;">
+      <h4 style="margin:0 0 10px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-tertiary,#64748b);border-bottom:1px solid var(--border,#e5e7eb);padding-bottom:6px;">
+        <i class="fas fa-percentage" style="color:#f59e0b;margin-right:6px;"></i>Historial tipos de interés
+      </h4>
+      <p style="font-size:12px;color:#888;margin:0 0 10px;">
+        Registra cambios en el tipo de interés. El tipo vigente en cada fecha se usa para calcular los intereses.
+      </p>
+      <table style="width:100%;font-size:13px;border-collapse:collapse;margin-bottom:10px;">
+        <thead>
+          <tr style="color:var(--text-tertiary,#64748b);font-size:11px;text-transform:uppercase;">
+            <th style="text-align:left;padding:4px 8px;">Desde</th>
+            <th style="text-align:right;padding:4px 8px;">Tipo (%)</th>
+            <th style="width:40px;"></th>
+          </tr>
+        </thead>
+        <tbody id="tbodyCRTipos">
+          <tr id="crTiposEmpty"><td colspan="3" style="text-align:center;color:#aaa;padding:10px;font-size:12px;">Sin cambios registrados</td></tr>
+        </tbody>
+      </table>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input type="text" id="crTipoDesde" maxlength="7" placeholder="YYYY-MM" style="flex:1;min-width:120px;font-size:13px;" title="Mes desde el que aplica este tipo">
+        <input type="number" id="crTipoInteres" step="0.01" min="0" max="100" placeholder="Tipo (%)" style="flex:1;min-width:100px;font-size:13px;">
+        <button id="btnAddCRTipo" style="white-space:nowrap;font-size:13px;">
+          <i class="fas fa-plus"></i> Añadir
+        </button>
+      </div>
+    </section>
+
+    <!-- Sección 3: Ajustes manuales de saldo -->
     <section>
       <h4 style="margin:0 0 10px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-tertiary,#64748b);border-bottom:1px solid var(--border,#e5e7eb);padding-bottom:6px;">
         <i class="fas fa-balance-scale" style="color:#10b981;margin-right:6px;"></i>Ajustes de saldo
@@ -311,6 +344,14 @@
         </button>
       </div>
     </section>
+
+    <!-- Informe fiscal -->
+    <div style="border-top:1px solid var(--border,#e5e7eb);padding-top:16px;margin-top:4px;">
+      <button id="btnExportFiscalCR" class="btn-primary" style="font-size:0.82rem;min-height:unset;padding:7px 16px;">
+        <i class="fas fa-file-csv"></i> Exportar informe fiscal
+      </button>
+      <span style="font-size:0.75rem;color:var(--text-secondary,#475569);margin-left:10px;">Intereses brutos/netos agrupados por año fiscal</span>
+    </div>
 
   </div>
 </div>

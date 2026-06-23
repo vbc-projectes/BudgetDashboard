@@ -16,7 +16,10 @@ const {
     getCategoriasPeriodoReal,
     getGastosCategoriaMes,
     getGastosCategoriaMesReal,
-    getResumenPeriodos
+    getResumenPeriodos,
+    getNetWorth,
+    getPresupuestosConGasto,
+    getAnomalias
 } = require('../services/dashboardService');
 
 const router = express.Router();
@@ -67,6 +70,18 @@ router.get('/gastos-categoria-mes-real', async (req, res, next) => {
 
 router.get('/resumen-periodos', async (req, res, next) => {
     try { res.json(await getResumenPeriodos()); } catch (err) { next(err); }
+});
+
+router.get('/dashboard/net-worth', async (req, res, next) => {
+    try { res.json(await getNetWorth()); } catch (err) { next(err); }
+});
+
+router.get('/dashboard/presupuestos', async (req, res, next) => {
+    try { res.json(await getPresupuestosConGasto(req.query.mes)); } catch (err) { next(err); }
+});
+
+router.get('/dashboard/anomalias', async (req, res, next) => {
+    try { res.json(await getAnomalias(parseInt(req.query.meses) || 6)); } catch (err) { next(err); }
 });
 
 module.exports = router;

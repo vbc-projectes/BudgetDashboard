@@ -39,7 +39,10 @@ const {
     getCategoriasPeriodoReal,
     getGastosCategoriaMes,
     getGastosCategoriaMesReal,
-    getResumenPeriodos
+    getResumenPeriodos,
+    getNetWorth,
+    getPresupuestosConGasto,
+    getAnomalias
 } = require('../services/dashboardService');
 
 // Inicializar servicios
@@ -636,6 +639,24 @@ function registerIpcHandlers() {
         return { success: true };
     });
 
+    // ── CR tipos de interés ──────────────────────────────────────────────────
+    safeHandle('cr-get-tipos-interes', async (event, data) => {
+        return await dbAll(db, `SELECT * FROM historial_tipos_interes WHERE cuenta_remunerada_id = ? ORDER BY desde ASC`, [data.id]) || [];
+    });
+    safeHandle('cr-add-tipo-interes', async (event, data) => {
+        const { id, desde, interes } = data;
+        await dbRun(db, `INSERT INTO historial_tipos_interes (cuenta_remunerada_id, desde, interes) VALUES (?, ?, ?)`, [id, desde, interes]);
+        return { success: true };
+    });
+    safeHandle('cr-delete-tipo-interes', async (event, data) => {
+        await dbRun(db, `DELETE FROM historial_tipos_interes WHERE id = ?`, [data.id]);
+        return { success: true };
+    });
+    safeHandle('cr-informe-fiscal', async () => {
+        const service = new CuentaRemuneradaService();
+        return await service.getInformeFiscal();
+    });
+
     // ============= ASSETS (Yahoo Finance) =============
     
     safeHandle('get-assets', async () => {
@@ -941,7 +962,6 @@ function registerIpcHandlers() {
     // ============= BOLSA / INVERSIONES =============
 
     const BolsaService = require('../services/BolsaService');
-    const yahooFinanceService = require('../services/yahooFinanceService');
     const bolsaService = new BolsaService();
 
     // Ensure bolsa tables exist (runs pending migrations)
@@ -1021,6 +1041,76 @@ function registerIpcHandlers() {
     safeHandle('bolsa-sync-dividendos', async () => {
         const result = await bolsaService.syncDividendosAuto(yahooFinanceService);
         return { success: true, stats: result.stats, totalAdded: result.totalAdded, totalUpdated: result.totalUpdated };
+    });
+
+    safeHandle('bolsa-get-desglose-sector', async () => {
+        return await bolsaService.getDesgloseSector();
+    });
+
+    safeHandle('bolsa-get-estadisticas-fiscales', async () => {
+        return await bolsaService.getEstadisticasFiscales();
+    });
+
+    safeHandle('asset-get-metadata', async (event, ticker) => {
+        return await yahooFinanceService.getAssetMetadata(ticker);
+    });
+
+    // ============= DASHBOARD EXTENSIONES =============
+
+    safeHandle('dashboard-get-net-worth', async () => {
+        return await getNetWorth();
+    });
+
+    safeHandle('dashboard-get-presupuestos', async (event, mes) => {
+        return await getPresupuestosConGasto(mes);
+    });
+
+    safeHandle('dashboard-get-anomalias', async (event, meses) => {
+        return await getAnomalias(meses || 6);
+    });
+
+    // ============= PRESUPUESTOS =============
+
+    safeHandle('presupuestos-get-all', async () => {
+        return await dbAll(db, `
+            SELECT pc.id, pc.categoria_id, pc.limite_mensual, pc.created_at, c.nombre AS categoria
+            FROM presupuestos_categoria pc JOIN categorias c ON pc.categoria_id = c.id ORDER BY c.nombre
+        `);
+    });
+
+    safeHandle('presupuestos-save', async (event, data) => {
+        const { categoria_id, limite_mensual } = data;
+        await dbRun(db,
+            `INSERT INTO presupuestos_categoria (categoria_id, limite_mensual) VALUES (?, ?)
+             ON CONFLICT(categoria_id) DO UPDATE SET limite_mensual = excluded.limite_mensual`,
+            [parseInt(categoria_id), parseFloat(limite_mensual)]
+        );
+        return { success: true };
+    });
+
+    safeHandle('presupuestos-delete', async (event, id) => {
+        await dbRun(db, `DELETE FROM presupuestos_categoria WHERE id=?`, [id]);
+        return { success: true };
+    });
+
+    // ============= BACKUP =============
+
+    safeHandle('backup-download', async (event) => {
+        const { dialog } = require('electron');
+        const fsExtra = require('fs');
+        const dbPath = db.__getDbPath();
+        if (!dbPath || dbPath === ':memory:') throw new Error('Backup no disponible para DB en memoria');
+        const today = new Date().toISOString().slice(0, 10);
+        const defaultName = `finanzas_backup_${today}.db`;
+        const win = BrowserWindow.fromWebContents(event.sender);
+        const { canceled, filePath: destPath } = await dialog.showSaveDialog(win, {
+            title: 'Guardar copia de seguridad',
+            defaultPath: defaultName,
+            filters: [{ name: 'SQLite Database', extensions: ['db'] }]
+        });
+        if (canceled || !destPath) return { success: false, canceled: true };
+        fsExtra.copyFileSync(dbPath, destPath);
+        return { success: true, path: destPath };
     });
 
     logger.info('IPC handlers registered');

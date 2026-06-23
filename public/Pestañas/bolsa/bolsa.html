@@ -10,7 +10,15 @@
 
   <!-- ===== CARTERA ===== -->
   <div id="tabBolsaCartera" class="subtab">
-    <h3 data-i18n="bolsa.resumenCartera">Resumen de Cartera</h3>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+      <h3 style="margin:0;" data-i18n="bolsa.resumenCartera">Resumen de Cartera</h3>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <label style="font-size:0.85em;">Alerta rebalanceo &gt; <input type="number" id="umbralRebalanceo" value="25" min="5" max="100" step="1" style="width:50px;"> %</label>
+        <button id="btnExportarFiscal" class="btn-secondary" style="font-size:0.85em;" title="Exportar ganancias/pérdidas para fiscalidad">
+          <i class="fas fa-file-csv"></i> Export fiscal
+        </button>
+      </div>
+    </div>
 
     <div class="bolsa-resumen-cards" id="bolsaResumenCards" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
       <div class="kpi-card"><span class="kpi-label" data-i18n="inversiones.kpi.invertido">Invertido</span><span class="kpi-value" id="bolsaTotalInvertido">—</span></div>
@@ -20,12 +28,16 @@
       <div class="kpi-card"><span class="kpi-label" data-i18n="inversiones.kpi.comisiones">Comisiones</span><span class="kpi-value" id="bolsaComisiones">—</span></div>
     </div>
 
+    <div id="bolsaRebalanceoAlerta" style="display:none;background:rgba(239,68,68,0.10);border:1px solid rgba(239,68,68,0.35);border-radius:var(--border-radius,8px);padding:8px 14px;margin-bottom:12px;font-size:0.88rem;color:var(--danger,#ef4444);font-weight:600;"></div>
+
     <div class="table-container">
       <table id="tablaCartera">
         <thead>
           <tr>
             <th data-i18n="tablas.ticker">Ticker</th>
             <th data-i18n="tablas.empresa">Empresa</th>
+            <th>Sector</th>
+            <th>Tipo</th>
             <th data-i18n="tablas.cantidad">Acciones</th>
             <th data-i18n="tablas.precioMedio">Precio medio</th>
             <th data-i18n="tablas.costeTotal">Coste total</th>
@@ -34,10 +46,46 @@
             <th data-i18n="tablas.pnl">P&amp;L</th>
             <th data-i18n="tablas.pnlPct">P&amp;L %</th>
             <th data-i18n="tablas.dividendos">Dividendos</th>
+            <th>Días</th>
           </tr>
         </thead>
         <tbody id="tbodyCartera"></tbody>
       </table>
+    </div>
+
+    <!-- Allocation charts -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px;" id="bolsaAllocationSection">
+      <div class="chart-card">
+        <h3 style="margin:0 0 12px;"><i class="fas fa-chart-pie icon-primary"></i> Asignación por tipo</h3>
+        <div style="position:relative;height:220px;"><canvas id="chartBolsaTipo"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3 style="margin:0 0 12px;"><i class="fas fa-globe icon-primary"></i> Asignación por sector</h3>
+        <div style="position:relative;height:220px;"><canvas id="chartBolsaSector"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Benchmark comparison -->
+    <div class="chart-card" style="margin-top:16px;">
+      <div class="chart-header" style="margin-bottom:12px;">
+        <h3 style="margin:0;"><i class="fas fa-chart-line icon-primary"></i> Comparativa vs Benchmark</h3>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <select id="benchmarkSelector" class="filtro-categoria" style="min-width:160px;">
+            <option value="IWDA.AS">MSCI World (IWDA.AS)</option>
+            <option value="SPY">S&amp;P 500 (SPY)</option>
+            <option value="^IBEX">IBEX 35</option>
+            <option value="^STOXX50E">Euro Stoxx 50</option>
+          </select>
+          <select id="benchmarkPeriodo" class="filtro-categoria" style="min-width:100px;">
+            <option value="3mo">3 meses</option>
+            <option value="6mo">6 meses</option>
+            <option value="1y" selected>1 año</option>
+            <option value="3y">3 años</option>
+          </select>
+          <button id="btnCargarBenchmark" class="btn-secondary" style="font-size:0.85rem;min-height:unset;padding:6px 14px;">Cargar</button>
+        </div>
+      </div>
+      <div style="position:relative;height:260px;"><canvas id="chartBenchmark"></canvas></div>
     </div>
   </div>
 
@@ -66,7 +114,10 @@
                 <option value="venta" data-i18n="inversiones.venta">Venta</option>
               </select>
             </td>
-            <td><input type="text" id="tickerOperacion" placeholder="AAPL" style="text-transform:uppercase;width:80px;"></td>
+            <td>
+              <input type="text" id="tickerOperacion" placeholder="AAPL" style="text-transform:uppercase;width:80px;">
+              <div style="font-size:0.75rem;color:var(--text-secondary,#475569);margin-top:2px;" id="tickerMetaDisplay"></div>
+            </td>
             <td><input type="text" id="empresaOperacion" data-i18n-placeholder="formularios.placeholderEmpresaOpc" placeholder="Empresa (opc.)"></td>
             <td><input type="date" id="fechaOperacion"></td>
             <td><input type="number" id="cantidadOperacion" step="0.0001" min="0.0001" placeholder="100" style="width:80px;"></td>
@@ -85,6 +136,13 @@
   <!-- ===== DIVIDENDOS ===== -->
   <div id="tabBolsaDividendos" class="subtab display-none">
     <h3 data-i18n="bolsa.tabs.dividendos">Dividendos</h3>
+
+    <!-- Dividend growth chart -->
+    <div class="chart-card" style="margin-bottom:16px;">
+      <h3 style="margin:0 0 12px;"><i class="fas fa-chart-bar icon-success"></i> Crecimiento de dividendos</h3>
+      <div style="position:relative;height:200px;"><canvas id="chartDividendosCrecimiento"></canvas></div>
+    </div>
+
     <div class="table-container">
       <table id="tablaDividendos">
         <thead>

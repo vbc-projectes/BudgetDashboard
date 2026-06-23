@@ -143,6 +143,39 @@ router.delete('/cuenta-remunerada/ajustes/:ajusteId', async (req, res, next) => 
     } catch (err) { next(err); }
 });
 
+// ── Historial tipos de interés ──────────────────────────────────────────────
+router.get('/cuenta-remunerada/:id/tipos-interes', async (req, res, next) => {
+    try {
+        const rows = await dbAll(db, `SELECT * FROM historial_tipos_interes WHERE cuenta_remunerada_id = ? ORDER BY desde ASC`, [req.params.id]);
+        res.json(rows || []);
+    } catch (err) { next(err); }
+});
+
+router.post('/cuenta-remunerada/:id/tipos-interes', async (req, res, next) => {
+    try {
+        const { desde, interes } = req.body;
+        if (!desde || interes === undefined) return res.status(400).json({ error: 'desde e interes son requeridos' });
+        await dbRun(db, `INSERT INTO historial_tipos_interes (cuenta_remunerada_id, desde, interes) VALUES (?, ?, ?)`, [req.params.id, desde, interes]);
+        res.json({ success: true });
+    } catch (err) { next(err); }
+});
+
+router.delete('/cuenta-remunerada/tipos-interes/:tipoId', async (req, res, next) => {
+    try {
+        await dbRun(db, `DELETE FROM historial_tipos_interes WHERE id = ?`, [req.params.tipoId]);
+        res.json({ success: true });
+    } catch (err) { next(err); }
+});
+
+// ── Informe fiscal de intereses ─────────────────────────────────────────────
+router.get('/cuenta-remunerada/:id/informe-fiscal', async (req, res, next) => {
+    try {
+        const service = new CuentaRemuneradaService();
+        const informe = await service.getInformeFiscal(req.params.id);
+        res.json(informe);
+    } catch (err) { next(err); }
+});
+
 // Vincular/desvincular cuenta remunerada de la cartera de bolsa (transacción atómica)
 router.post('/cuenta_remunerada/set-link', async (req, res, next) => {
     try {

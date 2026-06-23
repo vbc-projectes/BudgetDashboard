@@ -179,9 +179,19 @@ window.API = {
             'GET:/bolsa/posiciones':               () => api.bolsaGetPosiciones(),
             'GET:/bolsa/resumen':                  () => api.bolsaGetResumen(),
             'GET:/bolsa/estadisticas':             () => api.bolsaGetEstadisticas(),
+            'GET:/bolsa/desglose-sector':          () => api.bolsaGetDesgloseSector(),
+            'GET:/bolsa/estadisticas-fiscales':    () => api.bolsaGetEstadisticasFiscales(),
             'POST:/bolsa/sync-dividendos':         () => api.bolsaSyncDividendos(),
             'GET:/bolsa/cuenta-remunerada/saldo-diario': () => api.bolsaGetCRSaldoDiario(),
-            'GET:/cuenta-remunerada/saldo-hoy':           () => api.getCRSaldoHoy(),
+            'GET:/cuenta-remunerada/saldo-hoy':    () => api.getCRSaldoHoy(),
+            // Dashboard extensiones
+            'GET:/dashboard/net-worth':            () => api.getDashboardNetWorth(),
+            'GET:/dashboard/anomalias':            () => api.getDashboardAnomalias(),
+            // Presupuestos
+            'GET:/presupuestos':                   () => api.presupuestosGetAll(),
+            'POST:/presupuestos':                  () => api.presupuestosSave(body),
+            // Backup
+            'GET:/backup/download':                () => api.backupDownload(),
         };
 
         const exactKey = `${method}:${basePath}`;
@@ -208,6 +218,10 @@ window.API = {
                     return api.getGastosCategoriaMesReal({ desde: params.get('desde'), hasta: params.get('hasta') });
                 case '/sub_huchas/total':
                     return api.getSubHuchasTotal(params.get('mes'));
+                case '/dashboard/presupuestos':
+                    return api.getDashboardPresupuestos(params.get('mes'));
+                case '/dashboard/anomalias':
+                    return api.getDashboardAnomalias(params.get('meses') ? parseInt(params.get('meses')) : 6);
             }
         }
 
@@ -219,6 +233,9 @@ window.API = {
 
         if (method === 'GET' && (m = basePath.match(/^\/asset-history\/(.+)$/)))
             return api.getAssetHistory(decodeURIComponent(m[1]), params.get('period') || '1y');
+
+        if (method === 'GET' && (m = basePath.match(/^\/asset-metadata\/(.+)$/)))
+            return api.getAssetMetadata(decodeURIComponent(m[1]));
 
         if (method === 'GET' && (m = basePath.match(/^\/sub_huchas\/(\d+)\/puntuales$/)))
             return api.getSubHuchaPuntuales(Number(m[1]));
@@ -258,6 +275,22 @@ window.API = {
             return api.addCRAjuste({ id: Number(m[1]), ...body });
         if (method === 'DELETE' && (m = basePath.match(/^\/cuenta-remunerada\/ajustes\/(\d+)$/)))
             return api.deleteCRAjuste({ id: Number(m[1]) });
+
+        // CR tipos de interés
+        if (method === 'GET'    && (m = basePath.match(/^\/cuenta-remunerada\/(\d+)\/tipos-interes$/)))
+            return api.crGetTiposInteres({ id: Number(m[1]) });
+        if (method === 'POST'   && (m = basePath.match(/^\/cuenta-remunerada\/(\d+)\/tipos-interes$/)))
+            return api.crAddTipoInteres({ id: Number(m[1]), ...body });
+        if (method === 'DELETE' && (m = basePath.match(/^\/cuenta-remunerada\/tipos-interes\/(\d+)$/)))
+            return api.crDeleteTipoInteres({ id: Number(m[1]) });
+        if (method === 'GET'    && (m = basePath.match(/^\/cuenta-remunerada\/(\d+)\/informe-fiscal$/)))
+            return api.crInformeFiscal({ id: Number(m[1]) });
+
+        // Presupuestos por ID
+        if (method === 'PUT'    && (m = basePath.match(/^\/presupuestos\/(\d+)$/)))
+            return api.presupuestosSave({ ...body, id: Number(m[1]) });
+        if (method === 'DELETE' && (m = basePath.match(/^\/presupuestos\/(\d+)$/)))
+            return api.presupuestosDelete(Number(m[1]));
 
         throw new Error(`Ruta no implementada: ${method} ${url}`);
     }

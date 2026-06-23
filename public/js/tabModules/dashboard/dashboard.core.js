@@ -1479,6 +1479,9 @@ charts.gastosMes.updateChartStats = function() {
 
             console.log('✅ Dashboard actualizado correctamente');
             window.chartsInstances.push(charts.gastosMes);
+            window._dashCharts = charts;
+            window._dashData = { meses: labelsMeses, gastosMes: gastosConImpuestosMes, ingresosMes: ingresosTotalesMes, ahorrosMes };
+            window.dispatchEvent(new CustomEvent('dashboardUpdated', { detail: { desde, hasta } }));
         } catch (error) {
             console.error('❌ Error actualizando dashboard:', error);
             actualizarResumenKpis({ desde, hasta });

@@ -457,21 +457,110 @@ function renderInicioDeltas(currentMes, prevMes) {
     setNote('inicio-note-taxes', label, deltaBadge(cur.impuestos, prev.impuestos));
 }
 
+function renderInicioProximosGastos(gastosPuntuales, desde, hasta) {
+    const section   = document.getElementById('inicio-proximos-section');
+    const titleEl   = document.getElementById('inicio-proximos-title');
+    const subtitleEl = document.getElementById('inicio-proximos-subtitle');
+    const listEl    = document.getElementById('inicio-proximos-list');
+    const totalEl   = document.getElementById('inicio-proximos-total');
+    if (!section || !listEl) return;
+
+    const isFuture = ['proximo1mes', 'proximos3meses', 'proximos6meses'].includes(periodoActual);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const desdeDate = desde ? new Date(desde + 'T00:00:00') : null;
+    const hastaDate = hasta ? new Date(hasta + 'T23:59:59') : null;
+
+    const filtered = (gastosPuntuales || [])
+        .filter(g => {
+            if (!g.fecha) return false;
+            const d = new Date(g.fecha + 'T00:00:00');
+            return (!desdeDate || d >= desdeDate) && (!hastaDate || d <= hastaDate);
+        })
+        .map(g => ({ ...g, _date: new Date(g.fecha + 'T00:00:00') }))
+        .sort((a, b) => isFuture ? a._date - b._date : b._date - a._date);
+
+    const MAX_ITEMS = 15;
+    const shown = filtered.slice(0, MAX_ITEMS);
+    const remaining = filtered.length - shown.length;
+    const allTotal = filtered.reduce((s, g) => s + (g.monto || 0), 0);
+    const shownTotal = shown.reduce((s, g) => s + (g.monto || 0), 0);
+
+    if (titleEl) {
+        titleEl.innerHTML = isFuture
+            ? '<i class="fas fa-clock"></i> Próximos gastos'
+            : '<i class="fas fa-calendar-day"></i> Gastos del período';
+    }
+    if (subtitleEl) subtitleEl.textContent = getPeriodLabel(periodoActual);
+    if (totalEl) totalEl.textContent = filtered.length > 0 ? formatearEuro(allTotal) : '';
+
+    if (filtered.length === 0) {
+        listEl.innerHTML = `
+            <div class="inicio-prox-empty">
+                <i class="fas fa-check-circle"></i>
+                Sin gastos puntuales para este período
+            </div>`;
+        return;
+    }
+
+    const escH = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    listEl.innerHTML = shown.map(g => {
+        const diffDays = Math.round((g._date - today) / (1000 * 60 * 60 * 24));
+        const dateLabel = g._date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+        const dateLabelShort = g._date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' });
+
+        let badgeHtml = '';
+        let rowClass = '';
+        if (isFuture) {
+            const urgency = diffDays <= 3 ? 'urgent' : diffDays <= 7 ? 'soon' : '';
+            const badgeText = diffDays === 0 ? 'Hoy'
+                : diffDays === 1 ? 'Mañana'
+                : diffDays < 0  ? 'Vencido'
+                : `${diffDays}d`;
+            badgeHtml = `<span class="gcal-proximo-badge ${urgency}">${badgeText}</span>`;
+            rowClass = urgency;
+        } else {
+            badgeHtml = `<span class="gcal-proximo-badge">${dateLabel}</span>`;
+        }
+
+        return `<div class="gcal-proximo-item ${rowClass}">
+            <span class="gcal-proximo-date">${isFuture ? dateLabel : dateLabelShort}</span>
+            ${badgeHtml}
+            <span class="gcal-proximo-desc">${escH(g.descripcion)}</span>
+            ${g.categoria ? `<span class="gcal-proximo-cat">${escH(g.categoria)}</span>` : ''}
+            <span class="gcal-proximo-amount">${formatearEuro(g.monto)}</span>
+        </div>`;
+    }).join('')
+    + (remaining > 0
+        ? `<div class="inicio-prox-more">y ${remaining} más — ${formatearEuro(allTotal - shownTotal)} adicionales</div>`
+        : '');
+}
+
 async function renderInicioInsights() {
     if (!document.getElementById('inicioCategoriasList')) return;
 
-    let ahorrosMes = [], ahorrosPrev = [], categoriasData = { gastos: {} };
+    let ahorrosMes = [], ahorrosPrev = [], categoriasData = { gastos: {} }, gastosPuntuales = [];
+    let _desdeRange = '', _hastaRange = '';
 
     try {
         const { desde, hasta, prevDesde, prevHasta } = getInicioDateRange(periodoActual);
-        const [ahorrosRes, categoriasRes, ahorrosPrevRes] = await Promise.all([
+        _desdeRange = desde;
+        _hastaRange = hasta;
+        const [ahorrosRes, categoriasRes, ahorrosPrevRes, dashboardRes] = await Promise.all([
             fetch(`/ahorros-mes?desde=${desde}&hasta=${hasta}`),
             fetch(`/categorias-periodo?desde=${desde}&hasta=${hasta}`),
-            fetch(`/ahorros-mes?desde=${prevDesde}&hasta=${prevHasta}`)
+            fetch(`/ahorros-mes?desde=${prevDesde}&hasta=${prevHasta}`),
+            fetch('/dashboard')
         ]);
         if (ahorrosRes.ok) ahorrosMes = (await ahorrosRes.json()) || [];
         if (categoriasRes.ok) categoriasData = (await categoriasRes.json()) || { gastos: {} };
         if (ahorrosPrevRes.ok) ahorrosPrev = (await ahorrosPrevRes.json()) || [];
+        if (dashboardRes.ok) {
+            const dashData = await dashboardRes.json();
+            gastosPuntuales = dashData?.gastos_puntuales || [];
+        }
     } catch (error) {
         console.error('❌ Error cargando insights de inicio:', error);
     }
@@ -501,6 +590,7 @@ async function renderInicioInsights() {
     renderInicioEvolucion(ahorrosMesClipped, ahorrosPrevClipped);
     renderInicioCategorias(categoriasData?.gastos || {});
     renderInicioDeltas(ahorrosMesClipped, ahorrosPrevClipped);
+    renderInicioProximosGastos(gastosPuntuales, _desdeRange, _hastaRange);
 }
 
 function initInicio() {

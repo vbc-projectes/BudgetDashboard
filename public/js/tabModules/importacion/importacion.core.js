@@ -1822,9 +1822,10 @@ async function guardarEnBaseDatos() {
         }
 
         const respuestas = await Promise.all(promesas);
-        
+
         let exitosos = 0;
         let fallidos = 0;
+        let duplicados = 0;
         let mensajeError = '';
 
         for (const res of respuestas) {
@@ -1832,17 +1833,22 @@ async function guardarEnBaseDatos() {
             if (data.success) {
                 exitosos += data.exitosos || 0;
                 fallidos += data.fallidos || 0;
+                duplicados += (data.duplicados || []).length;
             } else {
                 mensajeError = data.error || 'Error desconocido';
                 fallidos += datosGastos.length + datosIngresos.length;
             }
         }
 
-        const total = exitosos + fallidos;
-        const mensaje = `Guardados: ${exitosos}/${total} registros`;
-        
+        const total = exitosos + fallidos + duplicados;
+        let mensaje = `Guardados: ${exitosos}/${total} registros`;
+        if (duplicados > 0) mensaje += ` · ${duplicados} duplicado${duplicados > 1 ? 's' : ''} omitido${duplicados > 1 ? 's' : ''}`;
+
         if (fallidos > 0) {
             showAlert(`${mensaje}\nFallidos: ${fallidos}\n${mensajeError ? mensajeError : ''}`, 'warning');
+        } else if (duplicados > 0) {
+            if (typeof notifyInfo === 'function') notifyInfo(`⚠️ ${duplicados} movimiento${duplicados > 1 ? 's' : ''} duplicado${duplicados > 1 ? 's' : ''} detectado${duplicados > 1 ? 's' : ''} y omitido${duplicados > 1 ? 's' : ''}`);
+            showAlert(mensaje, 'success');
         } else {
             showAlert(mensaje, 'success');
         }

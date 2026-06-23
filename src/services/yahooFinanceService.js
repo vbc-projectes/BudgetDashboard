@@ -11,8 +11,10 @@ const CACHE_DURATION = 60 * 60 * 1000; // 1 hora
 // Cachés en memoria para precios e históricos
 const PRICE_CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 const HISTORY_CACHE_DURATION = 30 * 60 * 1000; // 30 minutos
+const METADATA_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 horas
 const priceCache = new Map();
 const historicalCache = new Map();
+const metadataCache = new Map();
 // Deduplicación de peticiones históricas en vuelo (evita llamadas paralelas duplicadas al mismo ticker)
 const historicalInFlight = new Map();
 
@@ -871,4 +873,47 @@ async function getDividendEvents(ticker, startDate) {
     return { events: [], resolvedTicker: normalizedTicker };
 }
 
-module.exports = { getAssetPrice, obtenerTasaCambio, getHistoricalData, getDividendEvents };
+const QUOTE_TYPE_MAP = {
+    EQUITY:     'accion',
+    ETF:        'etf',
+    MUTUALFUND: 'fondo',
+    BOND:       'bono',
+    FUTURE:     'otro',
+    OPTION:     'otro',
+    CRYPTOCURRENCY: 'otro'
+};
+
+/**
+ * Obtiene metadatos de un activo (sector, tipo_activo) vía Yahoo Finance quoteSummary.
+ * Cachea resultados 24h. Si falla, retorna { sector: null, tipo_activo: null }.
+ */
+async function getAssetMetadata(ticker) {
+    const normalizedTicker = String(ticker || '').trim().toUpperCase();
+    if (!normalizedTicker) return { sector: null, tipo_activo: null };
+
+    const cached = metadataCache.get(normalizedTicker);
+    if (cached && Date.now() - cached.ts < METADATA_CACHE_DURATION) return cached.value;
+
+    try {
+        const candidates = buildTickerCandidates(normalizedTicker);
+        for (const candidate of candidates) {
+            try {
+                const summary = await yahooFinance.quoteSummary(candidate, {
+                    modules: ['assetProfile', 'price']
+                });
+                const sector = summary?.assetProfile?.sector || null;
+                const rawType = (summary?.price?.quoteType || '').toUpperCase();
+                const tipo_activo = QUOTE_TYPE_MAP[rawType] || (rawType ? 'otro' : null);
+                const value = { sector, tipo_activo };
+                metadataCache.set(normalizedTicker, { ts: Date.now(), value });
+                return value;
+            } catch (_) {}
+        }
+    } catch (_) {}
+
+    const fallback = { sector: null, tipo_activo: null };
+    metadataCache.set(normalizedTicker, { ts: Date.now(), value: fallback });
+    return fallback;
+}
+
+module.exports = { getAssetPrice, obtenerTasaCambio, getHistoricalData, getDividendEvents, getAssetMetadata };

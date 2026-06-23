@@ -9,6 +9,9 @@
       data-i18n="gastos.mensuales">Gastos Mensuales</button>
     <button id="tabGastosRealesBtn" class="subtab-btn" data-target="tabGastosReales"
       data-i18n="dashboard.gastosReales">Gastos Reales</button>
+    <button id="tabGastosCalendarioBtn" class="subtab-btn" data-target="tabGastosCalendario">
+      <i class="fas fa-calendar-alt"></i> Calendario
+    </button>
   </div>
 
   <!-- GASTOS PUNTUALES -->
@@ -30,6 +33,7 @@
           <th data-i18n="formularios.descripcion">Descripción</th>
           <th data-i18n="formularios.monto">Monto</th>
           <th data-i18n="formularios.categoria">Categoría</th>
+          <th data-i18n="tablas.notas">Notas</th>
           <th class="w-120" data-i18n="tablas.acciones">Acciones</th>
         </tr>
         <tr class="insert-row">
@@ -58,6 +62,7 @@
             </div>
           </td>
           <td><select id="categoriaGasto"></select></td>
+          <td><input type="text" id="notasGasto" placeholder="Notas (opc.)" style="width:120px;"></td>
           <td><button id="btnAgregarGastoPuntual"><i class="fas fa-plus"></i></button></td>
         </tr>
       </thead>
@@ -87,6 +92,7 @@
           <th data-i18n="gastos.ipc">IPC %</th>
           <th data-i18n="gastos.montoAjustado">Monto ajustado</th>
           <th data-i18n="formularios.categoria">Categoría</th>
+          <th data-i18n="tablas.notas">Notas</th>
           <th class="w-120" data-i18n="tablas.acciones">Acciones</th>
         </tr>
         <tr class="insert-row">
@@ -111,6 +117,7 @@
           </td>
           <td>—</td>
           <td><select id="categoriaMensual"></select></td>
+          <td><input type="text" id="notasMensual" placeholder="Notas (opc.)" style="width:120px;"></td>
           <td><button id="btnAgregarMensual"><i class="fas fa-plus"></i></button></td>
         </tr>
       </thead>
@@ -156,6 +163,38 @@
       </thead>
       <tbody></tbody>
     </table>
+    </div>
+  </div>
+
+
+  <!-- CALENDARIO DE GASTOS -->
+  <div id="tabGastosCalendario" class="subtab display-none">
+    <div class="gcal-wrapper">
+
+      <!-- Cabecera navegación -->
+      <div class="gcal-header">
+        <button class="gcal-nav-btn" id="gastoCalPrev" type="button" title="Mes anterior">
+          <i class="fas fa-chevron-left"></i>
+        </button>
+        <h3 class="gcal-title" id="gastoCalTitle"></h3>
+        <button class="gcal-nav-btn" id="gastoCalNext" type="button" title="Mes siguiente">
+          <i class="fas fa-chevron-right"></i>
+        </button>
+        <button class="gcal-today-btn" id="gastoCalToday" type="button">Hoy</button>
+      </div>
+
+      <!-- Barra de gastos recurrentes activos -->
+      <div class="gcal-summary" id="gastoCalSummary"></div>
+
+      <!-- Rejilla del calendario -->
+      <div class="gcal-grid" id="gastoCalGrid"></div>
+
+      <!-- Total del mes -->
+      <div class="gcal-footer" id="gastoCalFooter"></div>
+
+      <!-- Próximos gastos (3 meses) -->
+      <div class="gcal-proximos" id="gastoCalProximos"></div>
+
     </div>
   </div>
 

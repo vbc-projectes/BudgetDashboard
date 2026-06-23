@@ -125,4 +125,12 @@ router.get('/bolsa/ticker-history/:ticker', async (req, res, next) => {
     } catch (err) { next(err); }
 });
 
+router.get('/bolsa/desglose-sector', async (req, res, next) => {
+    try { res.json(await bolsaService.getDesgloseSector()); } catch (err) { next(err); }
+});
+
+router.get('/bolsa/estadisticas-fiscales', async (req, res, next) => {
+    try { res.json(await bolsaService.getEstadisticasFiscales()); } catch (err) { next(err); }
+});
+
 module.exports = router;

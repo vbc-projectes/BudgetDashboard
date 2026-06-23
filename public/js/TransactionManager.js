@@ -176,9 +176,9 @@ class TransactionManager {
         
         // Columnas por defecto
         if (type === 'puntual') {
-            return ['fecha', 'descripcion', 'monto', 'categoria'];
+            return ['fecha', 'descripcion', 'monto', 'categoria', 'notas'];
         } else if (type === 'mensual') {
-            return ['desde', 'hasta', 'descripcion', 'monto', 'categoria'];
+            return ['desde', 'hasta', 'descripcion', 'monto', 'categoria', 'notas'];
         }
         return [];
     }
@@ -371,8 +371,8 @@ class TransactionManager {
         };
 
         // Evento cancelar
-        actionsCell.querySelector('.cancelBtn').onclick = () => {
-            this.loadData();
+        actionsCell.querySelector('.cancelBtn').onclick = async () => {
+            await this.loadData();
         };
     }
 

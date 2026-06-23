@@ -80,16 +80,18 @@ function cargarIngresosForm() {
         if (isNaN(monto) || monto <= 0) return showAlert(ingresosManager.t('ingresos.montoInvalido', 'Monto inválido'));
         if (!categoria_id) return showAlert(ingresosManager.t('ingresos.seleccionaCategoria', 'Selecciona una categoría'));
 
+        const notas = document.getElementById('notasIngresoPuntual')?.value?.trim() || null;
         await fetch('/add/ingreso_puntual', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fecha, descripcion, monto, bruto, categoria_id })
+            body: JSON.stringify({ fecha, descripcion, monto, bruto, categoria_id, notas })
         });
 
         document.getElementById('fechaIngresoPuntual').value = '';
         document.getElementById('descIngresoPuntual').value = '';
         document.getElementById('montoIngresoPuntual').value = '';
         document.getElementById('brutoIngresoPuntual').value = '';
+        if (document.getElementById('notasIngresoPuntual')) document.getElementById('notasIngresoPuntual').value = '';
         
         ingresosManager.loadData();
         if (typeof cargarResumenPeriodos === 'function') cargarResumenPeriodos();
@@ -147,10 +149,11 @@ function cargarIngresosForm() {
         if (!validarMes(hasta)) return showAlert(ingresosManager.t('ingresos.formatoHasta', "El campo 'Hasta' debe tener formato YYYY-MM"));
         if (desde > hasta) return showAlert(ingresosManager.t('ingresos.desdeNoMayorHasta', "El mes 'desde' no puede ser mayor que 'hasta'"));
 
+        const notasMensual = document.getElementById('notasIngresoMensual')?.value?.trim() || null;
         await fetch('/add/ingreso_mensual', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ desde, hasta, descripcion, monto, bruto, categoria_id })
+            body: JSON.stringify({ desde, hasta, descripcion, monto, bruto, categoria_id, notas: notasMensual })
         });
 
         document.getElementById('desdeIngresoMensual').value = '';
@@ -158,6 +161,7 @@ function cargarIngresosForm() {
         document.getElementById('descIngresoMensual').value = '';
         document.getElementById('montoIngresoMensual').value = '';
         document.getElementById('brutoIngresoMensual').value = '';
+        if (document.getElementById('notasIngresoMensual')) document.getElementById('notasIngresoMensual').value = '';
         
         ingresosManager.loadData();
         if (typeof cargarResumenPeriodos === 'function') cargarResumenPeriodos();
@@ -315,24 +319,50 @@ function cargarIngresosForm() {
         });
     }
 
+    // Renderiza la tabla de tipos de interés dentro del modal
+    function renderCRTipos(lista) {
+        const tbody = document.getElementById('tbodyCRTipos');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        if (!lista.length) {
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#aaa;padding:10px;font-size:12px;">Sin cambios registrados</td></tr>';
+            return;
+        }
+        lista.forEach(t => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="padding:4px 8px;">${t.desde}</td>
+                <td style="padding:4px 8px;text-align:right;"><strong>${parseFloat(t.interes).toFixed(2)}%</strong></td>
+                <td style="padding:4px 8px;text-align:center;">
+                    <button data-id="${t.id}" class="btn-del-tipo btn-eliminar" title="Eliminar" style="padding:2px 7px;">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
     // Carga y muestra el modal para una CR concreta
     async function abrirModalCRConfig(cuentaId) {
         _crConfigId = cuentaId;
-        // Cargar ambas listas en paralelo
-        const [resAp, resAj] = await Promise.all([
+        const [resAp, resAj, resTi] = await Promise.all([
             fetch(`/cuenta-remunerada/${cuentaId}/aportaciones`),
-            fetch(`/cuenta-remunerada/${cuentaId}/ajustes`)
+            fetch(`/cuenta-remunerada/${cuentaId}/ajustes`),
+            fetch(`/cuenta-remunerada/${cuentaId}/tipos-interes`)
         ]);
         const aportaciones = resAp.ok ? await resAp.json() : [];
         const ajustes      = resAj.ok ? await resAj.json() : [];
+        const tipos        = resTi.ok ? await resTi.json() : [];
         renderCRAportaciones(aportaciones);
         renderCRAjustes(ajustes);
-        // Limpiar inputs
+        renderCRTipos(tipos);
         document.getElementById('crAportDesde').value    = '';
         document.getElementById('crAportCantidad').value = '';
         document.getElementById('crAjusteFecha').value   = '';
         document.getElementById('crAjusteSaldo').value   = '';
         document.getElementById('crAjusteDesc').value    = '';
+        document.getElementById('crTipoDesde').value     = '';
+        document.getElementById('crTipoInteres').value   = '';
         modalCRConfig.style.display = 'flex';
     }
 
@@ -396,6 +426,59 @@ function cargarIngresosForm() {
         await fetch(`/cuenta-remunerada/ajustes/${btn.dataset.id}`, { method: 'DELETE' });
         const lista = await (await fetch(`/cuenta-remunerada/${_crConfigId}/ajustes`)).json();
         renderCRAjustes(lista);
+    });
+
+    // Añadir tipo de interés
+    document.getElementById('btnAddCRTipo')?.addEventListener('click', async () => {
+        if (!_crConfigId) return;
+        const desde   = document.getElementById('crTipoDesde').value.trim();
+        const interes = parseFloat(document.getElementById('crTipoInteres').value);
+        if (!/^\d{4}-\d{2}$/.test(desde)) return showAlert('Indica el mes de inicio en formato YYYY-MM');
+        if (isNaN(interes) || interes < 0) return showAlert('Indica el tipo de interés anual (%)');
+        const res = await fetch(`/cuenta-remunerada/${_crConfigId}/tipos-interes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ desde, interes })
+        });
+        if (!res.ok) return showAlert('Error al guardar el tipo de interés');
+        const lista = await (await fetch(`/cuenta-remunerada/${_crConfigId}/tipos-interes`)).json();
+        renderCRTipos(lista);
+        document.getElementById('crTipoDesde').value   = '';
+        document.getElementById('crTipoInteres').value = '';
+    });
+
+    // Eliminar tipo de interés (delegación)
+    document.getElementById('tbodyCRTipos')?.addEventListener('click', async e => {
+        const btn = e.target.closest('.btn-del-tipo');
+        if (!btn || !_crConfigId) return;
+        const confirmed = await showConfirm('¿Eliminar este tipo de interés?');
+        if (!confirmed) return;
+        await fetch(`/cuenta-remunerada/tipos-interes/${btn.dataset.id}`, { method: 'DELETE' });
+        const lista = await (await fetch(`/cuenta-remunerada/${_crConfigId}/tipos-interes`)).json();
+        renderCRTipos(lista);
+    });
+
+    // Exportar informe fiscal CR
+    document.getElementById('btnExportFiscalCR')?.addEventListener('click', async () => {
+        if (!_crConfigId) return;
+        try {
+            const res = await fetch(`/cuenta-remunerada/${_crConfigId}/informe-fiscal`);
+            if (!res.ok) return showAlert('Error al obtener el informe fiscal');
+            const datos = await res.json();
+            if (!datos.length) return showAlert('No hay datos de intereses para exportar');
+            const header = 'Año;Interés bruto (€);Retención (%);Interés neto (€)';
+            const rows = datos.map(d => `${d.anio};${d.interes_bruto.toFixed(2)};${d.retencion_pct.toFixed(2)};${d.interes_neto.toFixed(2)}`);
+            const csv = [header, ...rows].join('\n');
+            const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            a.href     = url;
+            a.download = `informe_fiscal_CR_${new Date().getFullYear()}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            showAlert('Error al exportar el informe fiscal');
+        }
     });
 
     // ===== TOGGLE MOSTRAR ANTIGUOS =====

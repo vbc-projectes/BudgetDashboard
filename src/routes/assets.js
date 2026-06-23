@@ -143,4 +143,13 @@ router.get('/asset-history/:ticker', async (req, res, next) => {
     } catch (err) { next(err); }
 });
 
+router.get('/asset-metadata/:ticker', async (req, res, next) => {
+    try {
+        const ticker = String(req.params.ticker || '').trim().toUpperCase();
+        if (!ticker) return res.json({ sector: null, tipo_activo: null });
+        const data = await yahooFinanceService.getAssetMetadata(ticker);
+        res.json(data);
+    } catch (err) { next(err); }
+});
+
 module.exports = router;

@@ -107,7 +107,7 @@
 
 .dashboard-kpis {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 0.62rem;
     margin: 0 0 0.72rem;
 }
@@ -147,6 +147,10 @@
 
 .dashboard-kpi.kpi-4 {
     background: linear-gradient(135deg, #4caa76, #3b8d62);
+}
+
+.dashboard-kpi.kpi-nw {
+    background: linear-gradient(135deg, #7c3aed, #5b21b6);
 }
 
 .dashboard-kpi-label {

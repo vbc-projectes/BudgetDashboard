@@ -8,8 +8,7 @@
         neto: null
     };
 
-    // Each entry: { root: ReactRoot, container: HTMLElement }
-    const porcentajeReactRoots = {};
+    const porcentajeContainers = {};
 
     function crearOpcionesGrafico(optComun, titulo, apilado, createLegendClickHandler) {
         const opciones = {
@@ -169,100 +168,83 @@
         const container = document.getElementById(containerId);
         if (!container) return null;
 
-        if (typeof React === 'undefined' || typeof ReactDOM === 'undefined' || typeof ReactDOM.createRoot !== 'function') {
-            console.warn('⚠️ React/ReactDOM no disponibles para renderizar cilindros 3D');
-            container.innerHTML = '';
-            return {
-                destroy() {
-                    container.innerHTML = '';
-                }
-            };
-        }
-
-        const h = React.createElement;
-
         const titulo = String(config?.title || 'Porcentajes');
         const columnas = Array.isArray(config?.columns) ? config.columns : [];
         const legendItems = Array.isArray(config?.legend) ? config.legend : [];
 
-        const columnasNodes = columnas.map((col, colIdx) => {
+        const grid = document.createElement('div');
+        grid.className = 'porcentajes-3d-grid';
+
+        columnas.forEach(col => {
             const nombre = String(col.name || '');
             const segmentos = Array.isArray(col.segments) ? col.segments : [];
 
-            const segmentosNodes = segmentos
+            const stack = document.createElement('div');
+            stack.className = 'cylinder-stack';
+
+            segmentos
                 .filter(seg => Number(seg.value) > 0)
-                .map((seg, segIdx) => {
+                .forEach(seg => {
                     const valor = Math.max(0, Math.min(100, Number(seg.value) || 0));
-                    const color = String(seg.color || '#94a3b8');
-                    const tooltip = `${String(seg.label || '')}: ${valor.toFixed(1)}%`;
-                    return h(
-                        'div',
-                        {
-                            key: `${colIdx}-${segIdx}`,
-                            className: 'cylinder-seg',
-                            title: tooltip,
-                            style: {
-                                height: `${valor}%`,
-                                background: color
-                            }
-                        },
-                        valor >= 10
-                            ? h('span', { className: 'cylinder-seg-label' }, `${valor.toFixed(0)}%`)
-                            : null
-                    );
+                    const seg_el = document.createElement('div');
+                    seg_el.className = 'cylinder-seg';
+                    seg_el.title = `${String(seg.label || '')}: ${valor.toFixed(1)}%`;
+                    seg_el.style.height = `${valor}%`;
+                    seg_el.style.background = String(seg.color || '#94a3b8');
+                    if (valor >= 10) {
+                        const lbl = document.createElement('span');
+                        lbl.className = 'cylinder-seg-label';
+                        lbl.textContent = `${valor.toFixed(0)}%`;
+                        seg_el.appendChild(lbl);
+                    }
+                    stack.appendChild(seg_el);
                 });
 
-            return h(
-                'div',
-                { key: `col-${colIdx}`, className: 'cylinder-col' },
-                h('div', { className: 'cylinder-wrap' }, h('div', { className: 'cylinder-stack' }, segmentosNodes)),
-                h('div', { className: 'cylinder-name' }, nombre)
-            );
+            const wrap = document.createElement('div');
+            wrap.className = 'cylinder-wrap';
+            wrap.appendChild(stack);
+
+            const name_el = document.createElement('div');
+            name_el.className = 'cylinder-name';
+            name_el.textContent = nombre;
+
+            const col_el = document.createElement('div');
+            col_el.className = 'cylinder-col';
+            col_el.appendChild(wrap);
+            col_el.appendChild(name_el);
+            grid.appendChild(col_el);
         });
 
-        const legendNodes = legendItems.map((item, idx) =>
-            h(
-                'span',
-                { key: `legend-${idx}`, className: 'porcentajes-3d-legend-item' },
-                h('span', {
-                    className: 'porcentajes-3d-legend-dot',
-                    style: { background: String(item.color || '#94a3b8') }
-                }),
-                String(item.label || '')
-            )
-        );
+        const legend = document.createElement('div');
+        legend.className = 'porcentajes-3d-legend';
+        legendItems.forEach(item => {
+            const dot = document.createElement('span');
+            dot.className = 'porcentajes-3d-legend-dot';
+            dot.style.background = String(item.color || '#94a3b8');
+            const span = document.createElement('span');
+            span.className = 'porcentajes-3d-legend-item';
+            span.appendChild(dot);
+            span.appendChild(document.createTextNode(String(item.label || '')));
+            legend.appendChild(span);
+        });
 
-        const appNode = h(
-            React.Fragment,
-            null,
-            h('div', { className: 'porcentajes-3d-title' }, titulo),
-            h('div', { className: 'porcentajes-3d-grid' }, columnasNodes),
-            h('div', { className: 'porcentajes-3d-legend' }, legendNodes)
-        );
+        const titleEl = document.createElement('div');
+        titleEl.className = 'porcentajes-3d-title';
+        titleEl.textContent = titulo;
 
-        let entry = porcentajeReactRoots[containerId];
-        // If the DOM was rebuilt (tab reload), the stored container is a different node.
-        // Discard the stale root so we create a fresh one on the new container.
-        if (entry && entry.container !== container) {
-            try { entry.root.unmount(); } catch (_) {}
-            entry = null;
-            delete porcentajeReactRoots[containerId];
-        }
-        if (!entry) {
-            const root = ReactDOM.createRoot(container);
-            entry = { root, container };
-            porcentajeReactRoots[containerId] = entry;
-        }
-        entry.root.render(appNode);
+        container.innerHTML = '';
+        container.appendChild(titleEl);
+        container.appendChild(grid);
+        container.appendChild(legend);
+
+        porcentajeContainers[containerId] = container;
 
         return {
             destroy() {
-                const existingEntry = porcentajeReactRoots[containerId];
-                if (existingEntry) {
-                    try { existingEntry.root.unmount(); } catch (_) {}
-                    delete porcentajeReactRoots[containerId];
-                } else {
-                    container.innerHTML = '';
+                const c = porcentajeContainers[containerId];
+                if (c) {
+                    c.innerHTML = '';
+                    delete porcentajeContainers[containerId];
                 }
             }
         };

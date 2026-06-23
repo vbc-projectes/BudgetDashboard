@@ -413,13 +413,12 @@ async function initUserSelection() {
     const storedUser = localStorage.getItem('currentUser');
     const preferredUser = currentUser || (users.includes(storedUser) ? storedUser : null);
 
+    // Pre-seleccionar el último usuario para comodidad, pero siempre
+    // mostrar el selector: el usuario debe confirmar explícitamente.
     if (preferredUser) {
         if (select) select.value = preferredUser;
-        setUserLabel(preferredUser);
         await loadUserIcon(preferredUser);
-        await applyUserSelection(preferredUser, { auto: true });
-    } else {
-        toggleUserOverlay(true);
     }
+    toggleUserOverlay(true);
 }
 

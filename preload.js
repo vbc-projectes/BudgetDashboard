@@ -105,6 +105,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     addCRAjuste:    (data) => ipcRenderer.invoke('cr-add-ajuste',    data),
     deleteCRAjuste: (data) => ipcRenderer.invoke('cr-delete-ajuste', data),
 
+    // CR tipos de interés
+    crGetTiposInteres:  (data) => ipcRenderer.invoke('cr-get-tipos-interes',  data),
+    crAddTipoInteres:   (data) => ipcRenderer.invoke('cr-add-tipo-interes',   data),
+    crDeleteTipoInteres:(data) => ipcRenderer.invoke('cr-delete-tipo-interes',data),
+    crInformeFiscal:    (data) => ipcRenderer.invoke('cr-informe-fiscal',     data),
+
     // ============= ASSETS =============
     getAssets: () => ipcRenderer.invoke('get-assets'),
     addAsset: (data) => ipcRenderer.invoke('add-asset', data),
@@ -146,7 +152,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
     bolsaGetEstadisticas: () => ipcRenderer.invoke('bolsa-get-estadisticas'),
     bolsaGetTickerHistory: (ticker) => ipcRenderer.invoke('bolsa-get-ticker-history', ticker),
     bolsaSyncDividendos: () => ipcRenderer.invoke('bolsa-sync-dividendos'),
-    bolsaGetCRSaldoDiario: () => ipcRenderer.invoke('bolsa-get-cr-saldo-diario')
+    bolsaGetCRSaldoDiario: () => ipcRenderer.invoke('bolsa-get-cr-saldo-diario'),
+    bolsaGetDesgloseSector: () => ipcRenderer.invoke('bolsa-get-desglose-sector'),
+    bolsaGetEstadisticasFiscales: () => ipcRenderer.invoke('bolsa-get-estadisticas-fiscales'),
+
+    // ============= ASSET METADATA =============
+    getAssetMetadata: (ticker) => ipcRenderer.invoke('asset-get-metadata', ticker),
+
+    // ============= DASHBOARD EXTENSIONES =============
+    getDashboardNetWorth: () => ipcRenderer.invoke('dashboard-get-net-worth'),
+    getDashboardPresupuestos: (mes) => ipcRenderer.invoke('dashboard-get-presupuestos', mes),
+    getDashboardAnomalias: (meses) => ipcRenderer.invoke('dashboard-get-anomalias', meses),
+
+    // ============= PRESUPUESTOS =============
+    presupuestosGetAll: () => ipcRenderer.invoke('presupuestos-get-all'),
+    presupuestosSave: (data) => ipcRenderer.invoke('presupuestos-save', data),
+    presupuestosDelete: (id) => ipcRenderer.invoke('presupuestos-delete', id),
+
+    // ============= BACKUP =============
+    backupDownload: () => ipcRenderer.invoke('backup-download')
 });
 
 console.log('✅ Preload script cargado - API expuesta');

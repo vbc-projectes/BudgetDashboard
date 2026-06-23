@@ -49,10 +49,11 @@ async function inicializarTaxes() {
         if (isNaN(monto) || monto <= 0) return showAlert(impuestosManager.t('impuestos.montoInvalido', "Monto inválido"));
         if (!categoria) return showAlert(impuestosManager.t('impuestos.categoriaRequerida', "Categoría requerida"));
 
+        const notas = document.getElementById('notas-impuesto-p')?.value?.trim() || null;
         await fetch('/add/impuesto_puntual', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fecha, descripcion: desc, monto, categoria_id: categoria })
+            body: JSON.stringify({ fecha, descripcion: desc, monto, categoria_id: categoria, notas })
         });
 
         // Limpiar formulario
@@ -83,10 +84,11 @@ async function inicializarTaxes() {
         if (isNaN(monto) || monto <= 0) return showAlert(impuestosManager.t('impuestos.montoInvalido', "Monto inválido"));
         if (!categoria) return showAlert(impuestosManager.t('impuestos.categoriaRequerida', "Categoría requerida"));
 
+        const notasM = document.getElementById('notas-impuesto-m')?.value?.trim() || null;
         await fetch('/add/impuesto_mensual', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ desde, hasta, descripcion: desc, monto, categoria_id: categoria })
+            body: JSON.stringify({ desde, hasta, descripcion: desc, monto, categoria_id: categoria, notas: notasM })
         });
 
         // Limpiar formulario

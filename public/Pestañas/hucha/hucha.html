@@ -51,10 +51,17 @@
             <th data-i18n="formularios.desde">Desde</th>
             <th data-i18n="formularios.hasta">Hasta</th>
             <th data-i18n="subHucha.saldoActual">Saldo actual</th>
+            <th>Objetivo</th>
+            <th>Progreso</th>
             <th class="w-120" data-i18n="tablas.acciones">Acciones</th>
           </tr>
           <tr class="insert-row">
-            <td><input type="text" id="subHuchaNombre" data-i18n-placeholder="subHucha.placeholderNombre"></td>
+            <td>
+              <div style="display:flex;align-items:center;gap:4px;">
+                <input type="text" id="subHuchaIcono" maxlength="4" placeholder="🏠" style="width:36px;text-align:center;padding:4px;" title="Icono (emoji)">
+                <input type="text" id="subHuchaNombre" data-i18n-placeholder="subHucha.placeholderNombre" style="flex:1;">
+              </div>
+            </td>
             <td>
               <div class="input-euro flex-gap-8">
                 <span>€</span>
@@ -74,6 +81,12 @@
             <td>
               <input type="text" id="subHuchaHasta" data-i18n-placeholder="formularios.placeholderYYYYMM" maxlength="7"
                 pattern="\d{4}-\d{2}" data-i18n-title="formularios.formatoYYYYMM" title="Formato: YYYY-MM">
+            </td>
+            <td>—</td>
+            <td>
+              <input type="number" id="subHuchaObjetivo" step="0.01" min="0" placeholder="Objetivo €" style="width:90px;">
+              <input type="text" id="subHuchaFechaObj" maxlength="7" placeholder="YYYY-MM" style="width:80px;margin-top:2px;" title="Fecha objetivo YYYY-MM">
+              <input type="color" id="subHuchaColor" value="#4f8ef7" style="width:30px;height:28px;padding:2px;border:none;cursor:pointer;" title="Color">
             </td>
             <td>—</td>
             <td><button id="btnAgregarSubHucha"><i class="fas fa-plus"></i></button></td>

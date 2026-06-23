@@ -89,7 +89,7 @@ class CuentaRemuneradaService {
             `SELECT fecha, importe_bruto, retencion FROM dividendos ORDER BY fecha ASC`
         );
         const divByDate = {};
-        for (const div of dividendos) {
+        for (const div of (dividendos || [])) {
             const f = (div.fecha || '').slice(0, 10);
             const bruto = parseFloat(div.importe_bruto) || 0;
             const ret   = (parseFloat(div.retencion) || 0) !== 0
@@ -99,9 +99,25 @@ class CuentaRemuneradaService {
             if (neto > 0) divByDate[f] = (divByDate[f] || 0) + neto;
         }
 
-        const tasaAnual  = parseFloat(cuenta.interes) || 0;
-        const tasaDiaria = tasaAnual / 100 / 365;
+        const tasaBase   = parseFloat(cuenta.interes) || 0;
         const retencion  = parseFloat(cuenta.retencion) || 0;
+
+        // Historial de tipos de interés: permite que la tasa cambie a lo largo del tiempo
+        const tiposInteres = await dbAll(db,
+            `SELECT desde, interes FROM historial_tipos_interes WHERE cuenta_remunerada_id = ? ORDER BY desde ASC`,
+            [cuenta.id]
+        );
+
+        function tasaEfectiva(fechaStr) {
+            let tasa = tasaBase;
+            for (const t of (tiposInteres || [])) {
+                if (t.desde <= fechaStr) tasa = parseFloat(t.interes);
+                else break;
+            }
+            return tasa;
+        }
+
+        const tasaAnual  = tasaBase; // kept for tasaAnualEfectiva KPI (base rate)
 
         // Saldo inicial: monto tal como está en cuenta.desde.
         // El usuario introduce el saldo disponible a esa fecha directamente,
@@ -119,7 +135,7 @@ class CuentaRemuneradaService {
             `SELECT fecha, saldo FROM cuenta_remunerada_ajustes WHERE cuenta_id = ? ORDER BY fecha ASC`,
             [cuenta.id]
         );
-        const ajusteByFecha = new Map(ajustesRows.map(a => [a.fecha.slice(0, 10), parseFloat(a.saldo)]));
+        const ajusteByFecha = new Map((ajustesRows || []).map(a => [a.fecha.slice(0, 10), parseFloat(a.saldo)]));
 
         /**
          * Calcula la aportación efectiva en una fecha dada:
@@ -128,7 +144,7 @@ class CuentaRemuneradaService {
          */
         function aportacionEfectiva(fechaStr) {
             let valor = parseFloat(cuenta.aportacion_mensual) || 0;
-            for (const ap of aportaciones) {
+            for (const ap of (aportaciones || [])) {
                 if (ap.desde <= fechaStr) valor = parseFloat(ap.cantidad);
                 else break;
             }
@@ -170,10 +186,11 @@ class CuentaRemuneradaService {
             // Ajuste manual: sobreescribe el saldo calculado con el valor correcto del usuario
             if (ajusteByFecha.has(fechaStr)) saldo = ajusteByFecha.get(fechaStr);
 
-            // Interés diario acumulado
+            // Interés diario acumulado (usa la tasa vigente en este día)
+            const tasaDiariaHoy = tasaEfectiva(fechaStr) / 100 / 365;
             if (saldo > 0) {
-                interesAcum += saldo * tasaDiaria;
-                if (fechaStr <= endForHoy) interesAcumHoy += saldo * tasaDiaria;
+                interesAcum += saldo * tasaDiariaHoy;
+                if (fechaStr <= endForHoy) interesAcumHoy += saldo * tasaDiariaHoy;
             }
 
             const snapSaldo = parseFloat(saldo.toFixed(2));
@@ -202,6 +219,101 @@ class CuentaRemuneradaService {
             interesAcumuladoNeto,
             tasaAnualEfectiva: tasaAnual  // tasa nominal de la CR
         };
+    }
+
+    /**
+     * Genera el informe fiscal agrupado por año.
+     * Ejecuta la simulación completa y acumula interés bruto/neto por año fiscal.
+     * @returns {Promise<Array<{anio, interes_bruto, retencion_pct, interes_neto}>>}
+     */
+    async getInformeFiscal() {
+        let cuenta = await dbGet(db, `SELECT * FROM cuenta_remunerada WHERE linked_to_bolsa = 1 ORDER BY created_at LIMIT 1`);
+        if (!cuenta) cuenta = await dbGet(db, `SELECT * FROM cuenta_remunerada ORDER BY created_at LIMIT 1`);
+        if (!cuenta) return [];
+
+        const toLD = CuentaRemuneradaService._toLocalDateStr;
+        const _now = new Date();
+        const hoy  = toLD(_now);
+        const fechaInicio = CuentaRemuneradaService._parseDate(cuenta.desde, hoy.slice(0, 7) + '-01');
+        const fechaFin    = CuentaRemuneradaService._parseDate(cuenta.hasta, hoy);
+        const endForHoy   = fechaFin < hoy ? fechaFin : hoy;
+
+        const retencion = parseFloat(cuenta.retencion) || 0;
+        const tasaBase  = parseFloat(cuenta.interes) || 0;
+
+        const [ops, dividendos, aportaciones, ajustesRows, tiposInteres] = await Promise.all([
+            dbAll(db, `SELECT fecha, tipo, cantidad, precio_unitario, comision FROM operaciones_bolsa ORDER BY fecha ASC`),
+            dbAll(db, `SELECT fecha, importe_bruto, retencion FROM dividendos ORDER BY fecha ASC`),
+            dbAll(db, `SELECT desde, cantidad FROM cuenta_remunerada_aportaciones WHERE cuenta_id = ? ORDER BY desde ASC`, [cuenta.id]),
+            dbAll(db, `SELECT fecha, saldo FROM cuenta_remunerada_ajustes WHERE cuenta_id = ? ORDER BY fecha ASC`, [cuenta.id]),
+            dbAll(db, `SELECT desde, interes FROM historial_tipos_interes WHERE cuenta_remunerada_id = ? ORDER BY desde ASC`, [cuenta.id])
+        ]);
+
+        const movByDate = {};
+        for (const op of (ops || [])) {
+            const f = (op.fecha || '').slice(0, 10);
+            if (!movByDate[f]) movByDate[f] = 0;
+            const importe = parseFloat(op.cantidad) * parseFloat(op.precio_unitario) + parseFloat(op.comision || 0);
+            movByDate[f] += op.tipo === 'compra' ? -importe : (parseFloat(op.cantidad) * parseFloat(op.precio_unitario) - parseFloat(op.comision || 0));
+        }
+
+        const divByDate = {};
+        for (const div of (dividendos || [])) {
+            const f = (div.fecha || '').slice(0, 10);
+            const bruto = parseFloat(div.importe_bruto) || 0;
+            const ret   = parseFloat(div.retencion) || bruto * 19 / 100;
+            divByDate[f] = (divByDate[f] || 0) + Math.max(0, bruto - ret);
+        }
+
+        const ajusteMap = new Map((ajustesRows || []).map(a => [a.fecha.slice(0, 10), parseFloat(a.saldo)]));
+
+        const tasaEfFiscal = (fechaStr) => {
+            let tasa = tasaBase;
+            for (const t of (tiposInteres || [])) {
+                if (t.desde <= fechaStr) tasa = parseFloat(t.interes);
+                else break;
+            }
+            return tasa;
+        };
+
+        const aportEf = (fechaStr) => {
+            let valor = parseFloat(cuenta.aportacion_mensual) || 0;
+            for (const ap of (aportaciones || [])) {
+                if (ap.desde <= fechaStr) valor = parseFloat(ap.cantidad);
+                else break;
+            }
+            return valor;
+        };
+
+        let saldo = parseFloat(cuenta.monto) || 0;
+        const interesAnio = {};
+        let current  = new Date(fechaInicio + 'T00:00:00');
+        const endDate = new Date(endForHoy + 'T00:00:00');
+        if (endDate < current) endDate.setTime(current.getTime());
+
+        let prevMonth = current.getMonth();
+        while (current <= endDate) {
+            const fechaStr = toLD(current);
+            const curMonth = current.getMonth();
+            if (fechaStr > fechaInicio && current.getDate() === 1 && curMonth !== prevMonth) saldo += aportEf(fechaStr);
+            prevMonth = curMonth;
+            if (movByDate[fechaStr]) saldo += movByDate[fechaStr];
+            if (divByDate[fechaStr]) saldo += divByDate[fechaStr];
+            if (ajusteMap.has(fechaStr)) saldo = ajusteMap.get(fechaStr);
+            if (saldo > 0) {
+                const interesDia = saldo * tasaEfFiscal(fechaStr) / 100 / 365;
+                const anio = fechaStr.slice(0, 4);
+                interesAnio[anio] = (interesAnio[anio] || 0) + interesDia;
+            }
+            current.setDate(current.getDate() + 1);
+        }
+
+        return Object.entries(interesAnio).sort(([a], [b]) => a.localeCompare(b)).map(([anio, bruto]) => ({
+            anio,
+            interes_bruto: parseFloat(bruto.toFixed(2)),
+            retencion_pct: retencion,
+            interes_neto:  parseFloat((bruto * (1 - retencion / 100)).toFixed(2))
+        }));
     }
 
     /**

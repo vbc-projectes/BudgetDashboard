@@ -25,6 +25,7 @@
           <th data-i18n="tablas.descripcion">Descripción</th>
           <th data-i18n="tablas.monto">Monto</th>
           <th data-i18n="tablas.categoria">Categoría</th>
+          <th data-i18n="tablas.notas">Notas</th>
           <th class="w-120" data-i18n="tablas.acciones">Acciones</th>
         </tr>
         <tr class="insert-row">
@@ -38,6 +39,7 @@
             </div>
           </td>
           <td><select id="cat-impuesto-p"></select></td>
+          <td><input type="text" id="notas-impuesto-p" placeholder="Notas (opc.)" style="width:120px;"></td>
           <td><button id="btnAgregarImpuestoPuntual"><i class="fas fa-plus"></i></button></td>
         </tr>
       </thead>
@@ -65,6 +67,7 @@
           <th data-i18n="tablas.categoria">Categoría</th>
           <th data-i18n="formularios.desde">Desde</th>
           <th data-i18n="formularios.hasta">Hasta</th>
+          <th data-i18n="tablas.notas">Notas</th>
           <th class="w-120" data-i18n="tablas.acciones">Acciones</th>
         </tr>
         <tr class="insert-row">
@@ -85,6 +88,7 @@
             <input type="text" id="hasta-impuesto-m" data-i18n-placeholder="formularios.placeholderYYYYMM" maxlength="7"
               pattern="\\d{4}-\\d{2}" data-i18n-title="formularios.formatoYYYYMM" title="Formato: YYYY-MM">
           </td>
+          <td><input type="text" id="notas-impuesto-m" placeholder="Notas (opc.)" style="width:120px;"></td>
           <td><button id="btnAgregarImpuestoMensual"><i class="fas fa-plus"></i></button></td>
         </tr>
       </thead>

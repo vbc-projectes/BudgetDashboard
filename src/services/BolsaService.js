@@ -6,6 +6,7 @@
 const db = require('../config/database');
 const { dbRun, dbGet, dbAll } = require('../utils/dbHelpers');
 const CuentaRemuneradaService = require('./CuentaRemuneradaService');
+const yahooFinanceService = require('./yahooFinanceService');
 
 class BolsaService {
 
@@ -13,12 +14,13 @@ class BolsaService {
 
     async getOperaciones(limit = 500) {
         return await dbAll(db, `
-            SELECT * FROM operaciones_bolsa ORDER BY fecha DESC, created_at DESC LIMIT ?
+            SELECT id, ticker, empresa, tipo, fecha, cantidad, precio_unitario, comision, notas, sector, tipo_activo, created_at
+            FROM operaciones_bolsa ORDER BY fecha DESC, created_at DESC LIMIT ?
         `, [limit]);
     }
 
     async addOperacion(data) {
-        const { ticker, empresa, tipo, fecha, cantidad, precio_unitario, comision, notas } = data;
+        const { ticker, empresa, tipo, fecha, cantidad, precio_unitario, comision, notas, sector, tipo_activo } = data;
         if (!ticker || !tipo || !fecha || !cantidad || !precio_unitario) {
             throw new Error('ticker, tipo, fecha, cantidad y precio_unitario son requeridos');
         }
@@ -28,29 +30,12 @@ class BolsaService {
         if (parseFloat(cantidad) <= 0) throw new Error('La cantidad debe ser mayor que cero');
         if (parseFloat(precio_unitario) <= 0) throw new Error('El precio debe ser mayor que cero');
 
-        await dbRun(db,
-            `INSERT INTO operaciones_bolsa (ticker, empresa, tipo, fecha, cantidad, precio_unitario, comision, notas)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        const normalizedTicker = ticker.trim().toUpperCase();
+        const result = await dbRun(db,
+            `INSERT INTO operaciones_bolsa (ticker, empresa, tipo, fecha, cantidad, precio_unitario, comision, notas, sector, tipo_activo)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                ticker.trim().toUpperCase(),
-                empresa || null,
-                tipo,
-                fecha,
-                parseFloat(cantidad),
-                parseFloat(precio_unitario),
-                parseFloat(comision) || 0,
-                notas || null
-            ]
-        );
-    }
-
-    async updateOperacion(data) {
-        const { id, ticker, empresa, tipo, fecha, cantidad, precio_unitario, comision, notas } = data;
-        if (!id) throw new Error('ID es requerido');
-        await dbRun(db,
-            `UPDATE operaciones_bolsa SET ticker=?, empresa=?, tipo=?, fecha=?, cantidad=?, precio_unitario=?, comision=?, notas=? WHERE id=?`,
-            [
-                ticker.trim().toUpperCase(),
+                normalizedTicker,
                 empresa || null,
                 tipo,
                 fecha,
@@ -58,9 +43,64 @@ class BolsaService {
                 parseFloat(precio_unitario),
                 parseFloat(comision) || 0,
                 notas || null,
+                sector || null,
+                tipo_activo || null
+            ]
+        );
+
+        // Auto-detectar sector/tipo_activo si no se proporcionaron
+        if (!sector || !tipo_activo) {
+            const insertedId = result?.lastID;
+            if (insertedId) {
+                yahooFinanceService.getAssetMetadata(normalizedTicker).then(meta => {
+                    const updates = [];
+                    const params = [];
+                    if (!sector && meta.sector) { updates.push('sector=?'); params.push(meta.sector); }
+                    if (!tipo_activo && meta.tipo_activo) { updates.push('tipo_activo=?'); params.push(meta.tipo_activo); }
+                    if (updates.length > 0) {
+                        params.push(insertedId);
+                        dbRun(db, `UPDATE operaciones_bolsa SET ${updates.join(',')} WHERE id=?`, params).catch(() => {});
+                    }
+                }).catch(() => {});
+            }
+        }
+    }
+
+    async updateOperacion(data) {
+        const { id, ticker, empresa, tipo, fecha, cantidad, precio_unitario, comision, notas, sector, tipo_activo } = data;
+        if (!id) throw new Error('ID es requerido');
+        const normalizedTicker = ticker.trim().toUpperCase();
+        await dbRun(db,
+            `UPDATE operaciones_bolsa SET ticker=?, empresa=?, tipo=?, fecha=?, cantidad=?, precio_unitario=?, comision=?, notas=?, sector=?, tipo_activo=? WHERE id=?`,
+            [
+                normalizedTicker,
+                empresa || null,
+                tipo,
+                fecha,
+                parseFloat(cantidad),
+                parseFloat(precio_unitario),
+                parseFloat(comision) || 0,
+                notas || null,
+                sector || null,
+                tipo_activo || null,
                 id
             ]
         );
+
+        // Re-detectar metadatos si cambia el ticker
+        const existing = await dbGet(db, `SELECT sector, tipo_activo FROM operaciones_bolsa WHERE id=?`, [id]);
+        if (!existing?.sector || !existing?.tipo_activo) {
+            yahooFinanceService.getAssetMetadata(normalizedTicker).then(meta => {
+                const updates = [];
+                const params = [];
+                if (!existing?.sector && meta.sector) { updates.push('sector=?'); params.push(meta.sector); }
+                if (!existing?.tipo_activo && meta.tipo_activo) { updates.push('tipo_activo=?'); params.push(meta.tipo_activo); }
+                if (updates.length > 0) {
+                    params.push(id);
+                    dbRun(db, `UPDATE operaciones_bolsa SET ${updates.join(',')} WHERE id=?`, params).catch(() => {});
+                }
+            }).catch(() => {});
+        }
     }
 
     async deleteOperacion(id) {
@@ -72,7 +112,8 @@ class BolsaService {
 
     async getDividendos(limit = 500) {
         return await dbAll(db, `
-            SELECT * FROM dividendos ORDER BY fecha DESC, created_at DESC LIMIT ?
+            SELECT id, ticker, empresa, fecha, importe_bruto, retencion, notas, source, importe_por_accion, created_at
+            FROM dividendos ORDER BY fecha DESC, created_at DESC LIMIT ?
         `, [limit]);
     }
 
@@ -120,20 +161,24 @@ class BolsaService {
     // Used by getPosiciones() and getResumen() to avoid duplicating the loop.
     async _replayOperaciones() {
         const operaciones = await dbAll(db, `
-            SELECT ticker, empresa, tipo, cantidad, precio_unitario, comision, fecha
+            SELECT ticker, empresa, tipo, cantidad, precio_unitario, comision, fecha, sector, tipo_activo
             FROM operaciones_bolsa ORDER BY ticker, fecha ASC, id ASC
         `);
 
         const map = {};
+        const today = new Date().toISOString().slice(0, 10);
         for (const op of operaciones) {
             if (!map[op.ticker]) {
-                map[op.ticker] = { ticker: op.ticker, empresa: op.empresa, cantidad: 0, base_coste: 0, precio_base: 0, comisiones: 0, ganancia_realizada: 0 };
+                map[op.ticker] = { ticker: op.ticker, empresa: op.empresa, cantidad: 0, base_coste: 0, precio_base: 0, comisiones: 0, ganancia_realizada: 0, primera_compra: null, sector: op.sector || null, tipo_activo: op.tipo_activo || null };
             }
             const pos = map[op.ticker];
             if (op.empresa) pos.empresa = op.empresa;
+            if (op.sector && !pos.sector) pos.sector = op.sector;
+            if (op.tipo_activo && !pos.tipo_activo) pos.tipo_activo = op.tipo_activo;
             pos.comisiones += op.comision || 0;
 
             if (op.tipo === 'compra') {
+                if (!pos.primera_compra) pos.primera_compra = op.fecha;
                 pos.base_coste  += op.cantidad * op.precio_unitario + (op.comision || 0);
                 pos.precio_base += op.cantidad * op.precio_unitario;
                 pos.cantidad    += op.cantidad;
@@ -160,17 +205,99 @@ class BolsaService {
 
         const posicionesAbiertas = Object.values(map)
             .filter(p => p.cantidad > 0.0001)
-            .map(p => ({
-                ticker:           p.ticker,
-                empresa:          p.empresa || p.ticker,
-                cantidad:         Math.round(p.cantidad   * 10000) / 10000,
-                coste_total:      Math.round(p.base_coste * 100)   / 100,
-                precio_medio:     p.cantidad > 0 ? Math.round((p.base_coste / p.cantidad) * 100) / 100 : 0,
-                comisiones:       Math.round(p.comisiones * 100)   / 100,
-                dividendos_netos: Math.round((divMap[p.ticker] || 0) * 100) / 100
-            }));
+            .map(p => {
+                const dias_en_posicion = p.primera_compra
+                    ? Math.floor((new Date(today) - new Date(p.primera_compra)) / 86400000)
+                    : null;
+                return {
+                    ticker:           p.ticker,
+                    empresa:          p.empresa || p.ticker,
+                    cantidad:         Math.round(p.cantidad   * 10000) / 10000,
+                    coste_total:      Math.round(p.base_coste * 100)   / 100,
+                    precio_medio:     p.cantidad > 0 ? Math.round((p.base_coste / p.cantidad) * 100) / 100 : 0,
+                    comisiones:       Math.round(p.comisiones * 100)   / 100,
+                    dividendos_netos: Math.round((divMap[p.ticker] || 0) * 100) / 100,
+                    primera_compra:   p.primera_compra,
+                    dias_en_posicion: dias_en_posicion,
+                    sector:           p.sector,
+                    tipo_activo:      p.tipo_activo
+                };
+            });
 
         return { map, posicionesAbiertas, divMap };
+    }
+
+    async getDesgloseSector() {
+        const { posicionesAbiertas } = await this._replayOperaciones();
+        const total = posicionesAbiertas.reduce((s, p) => s + p.coste_total, 0);
+
+        const bySector = {};
+        const byTipo = {};
+        for (const p of posicionesAbiertas) {
+            const s = p.sector || 'Desconocido';
+            const t = p.tipo_activo || 'otro';
+            bySector[s] = (bySector[s] || 0) + p.coste_total;
+            byTipo[t]   = (byTipo[t]   || 0) + p.coste_total;
+        }
+
+        const toArr = (obj) => Object.entries(obj)
+            .map(([nombre, coste]) => ({ nombre, coste: Math.round(coste * 100) / 100, pct: total > 0 ? Math.round(coste / total * 10000) / 100 : 0 }))
+            .sort((a, b) => b.coste - a.coste);
+
+        return { total: Math.round(total * 100) / 100, por_sector: toArr(bySector), por_tipo: toArr(byTipo) };
+    }
+
+    async getEstadisticasFiscales() {
+        const operaciones = await dbAll(db, `
+            SELECT ticker, empresa, tipo, cantidad, precio_unitario, comision, fecha
+            FROM operaciones_bolsa ORDER BY ticker, fecha ASC, id ASC
+        `);
+
+        const map = {};
+        const ventas = [];
+
+        for (const op of operaciones) {
+            if (!map[op.ticker]) {
+                map[op.ticker] = { ticker: op.ticker, empresa: op.empresa || op.ticker, cantidad: 0, base_coste: 0, primera_compra: null, lotes: [] };
+            }
+            const pos = map[op.ticker];
+            if (op.empresa) pos.empresa = op.empresa;
+
+            if (op.tipo === 'compra') {
+                if (!pos.primera_compra) pos.primera_compra = op.fecha;
+                pos.lotes.push({ fecha: op.fecha, cantidad: op.cantidad, precio: op.precio_unitario, comision: op.comision || 0 });
+                pos.base_coste += op.cantidad * op.precio_unitario + (op.comision || 0);
+                pos.cantidad   += op.cantidad;
+            } else if (pos.cantidad > 0) {
+                const costePorAccion = pos.base_coste / pos.cantidad;
+                const costeBase      = op.cantidad * costePorAccion;
+                const ingreso        = op.cantidad * op.precio_unitario - (op.comision || 0);
+                const ganancia_neta  = ingreso - costeBase;
+                const dias_tenencia  = pos.primera_compra
+                    ? Math.floor((new Date(op.fecha) - new Date(pos.primera_compra)) / 86400000)
+                    : null;
+                ventas.push({
+                    ticker:         op.ticker,
+                    empresa:        pos.empresa,
+                    fecha_compra:   pos.primera_compra,
+                    fecha_venta:    op.fecha,
+                    precio_compra:  Math.round(costePorAccion * 100) / 100,
+                    precio_venta:   Math.round(op.precio_unitario * 100) / 100,
+                    cantidad:       Math.round(op.cantidad * 10000) / 10000,
+                    coste_base:     Math.round(costeBase * 100) / 100,
+                    ingreso_neto:   Math.round(ingreso * 100) / 100,
+                    ganancia_neta:  Math.round(ganancia_neta * 100) / 100,
+                    ganancia_pct:   costeBase > 0 ? Math.round(ganancia_neta / costeBase * 10000) / 100 : 0,
+                    dias_tenencia:  dias_tenencia
+                });
+                pos.base_coste -= costeBase;
+                pos.cantidad   -= op.cantidad;
+                if (pos.cantidad < 0.0001) { pos.cantidad = 0; pos.base_coste = 0; pos.primera_compra = null; }
+            }
+        }
+
+        const total_ganancia = ventas.reduce((s, v) => s + v.ganancia_neta, 0);
+        return { ventas, total_ganancia: Math.round(total_ganancia * 100) / 100 };
     }
 
     async getPosiciones() {

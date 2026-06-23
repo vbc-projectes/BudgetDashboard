@@ -553,6 +553,80 @@ main {
     font-size: 0.9rem;
 }
 
+/* --- Sección próximos gastos en inicio --- */
+.inicio-proximos-panel {
+    min-height: unset;
+    padding: 0;
+    margin-top: 1rem;
+}
+
+.inicio-prox-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.7rem 1rem;
+    background: var(--gray-50);
+    border-bottom: 1px solid var(--border-light);
+    flex-wrap: wrap;
+}
+
+.inicio-proximos-panel h3 {
+    font-size: 0.9rem !important;
+    font-weight: 600 !important;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+}
+
+.inicio-prox-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.inicio-prox-subtitle {
+    font-size: 0.78rem;
+    color: var(--text-tertiary);
+}
+
+.inicio-prox-total {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--danger);
+}
+
+.inicio-prox-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.inicio-prox-empty {
+    padding: 1rem;
+    text-align: center;
+    color: var(--text-tertiary);
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+}
+
+.inicio-prox-empty i {
+    color: var(--success);
+}
+
+.inicio-prox-more {
+    padding: 0.45rem 0.9rem;
+    font-size: 0.78rem;
+    color: var(--text-tertiary);
+    border-top: 1px solid var(--gray-100);
+    text-align: center;
+    font-style: italic;
+}
+
 .inicio-chart-wrap {
     position: relative;
     height: 210px;
