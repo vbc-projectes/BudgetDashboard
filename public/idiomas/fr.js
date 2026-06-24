@@ -153,7 +153,12 @@ TRADUCCIONES.fr = {
                 titulo: 'Paramètres',
                 descripcion: 'Configurer le thème, la langue et la devise de travail',
                 usuarioActivo: 'Utilisateur actif',
-                cambiarUsuarioSidebar: 'Vous pouvez changer d\'utilisateur depuis le bouton de la barre latérale.'
+                cambiarUsuarioSidebar: 'Vous pouvez changer d\'utilisateur depuis le sélecteur de profils.',
+                retencionDividendos: 'Retenue dividendes (%):',
+                retencionDividendosNota: 'Appliqué automatiquement à tous les dividendes sans retenue propre.',
+                copiaSeguridad: 'Sauvegarde',
+                copiaDescripcion: 'Téléchargez une copie de votre base de données SQLite.',
+                descargarBackup: 'Télécharger la sauvegarde'
             },
 
         usuarios: {
@@ -166,7 +171,39 @@ TRADUCCIONES.fr = {
             placeholderNombre: 'Nom',
             crear: 'Créer',
             refrescar: 'Actualiser',
-            sinUsuario: 'Aucun utilisateur'
+            sinUsuario: 'Aucun utilisateur',
+            quienEres: 'Qui êtes-vous ?',
+            gestionarPerfiles: 'Gérer les profils',
+            introducePIN: 'Entrez votre PIN',
+            pinIncorrecto: 'PIN incorrect. Veuillez réessayer.',
+            volver: '← Retour',
+            eligeAvatar: 'Choisissez un avatar',
+            avatarActualizado: 'Avatar mis à jour',
+            usuarioCreado: 'Utilisateur "{name}" créé',
+            cargandoUsuarios: 'Chargement...',
+            errorCargandoUsuarios: 'Erreur lors du chargement des utilisateurs',
+            sinUsuarios: 'Aucun utilisateur. Créez-en un depuis "Gérer les profils".',
+            anadirPIN: '+ PIN',
+            quitarPIN: '🔒 Supprimer PIN',
+            pinEstablecido: 'PIN défini',
+            pinEliminado: 'PIN supprimé'
+        },
+
+        presupuestos: {
+            titulo: 'Budget de la période',
+            gestionarLimites: 'Gérer les limites',
+            categoria: 'Catégorie',
+            limite: 'Limite',
+            limitePeriodo: 'Limite période',
+            gastado: 'Dépensé',
+            restante: 'Restant',
+            progreso: 'Progression',
+            estado: 'Statut',
+            superado: '⚠️ Dépassé',
+            ok: '✓ OK',
+            sinPresupuestos: 'Aucun budget configuré. Cliquez sur "Gérer les limites" pour ajouter.',
+            errorCargando: 'Erreur lors du chargement des budgets.',
+            sinRango: 'Aucune plage de dates.'
         },
 
         // ===== IMPORTACIÓN BANCARIA =====

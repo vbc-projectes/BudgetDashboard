@@ -149,7 +149,12 @@ TRADUCCIONES.es = {
                 titulo: 'Ajustes',
                 descripcion: 'Configura tema, idioma y moneda de trabajo',
                 usuarioActivo: 'Usuario activo',
-                cambiarUsuarioSidebar: 'Puedes cambiar de usuario desde el botón del sidebar.'
+                cambiarUsuarioSidebar: 'Puedes cambiar de usuario desde el selector de perfiles.',
+                retencionDividendos: 'Retención dividendos (%):',
+                retencionDividendosNota: 'Se aplica automáticamente a todos los dividendos que no tengan retención propia.',
+                copiaSeguridad: 'Copia de seguridad',
+                copiaDescripcion: 'Descarga una copia de tu base de datos SQLite.',
+                descargarBackup: 'Descargar backup'
             },
 
         usuarios: {
@@ -162,7 +167,39 @@ TRADUCCIONES.es = {
             placeholderNombre: 'Nombre',
             crear: 'Crear',
             refrescar: 'Refrescar',
-            sinUsuario: 'Sin usuario'
+            sinUsuario: 'Sin usuario',
+            quienEres: '¿Quién eres?',
+            gestionarPerfiles: 'Gestionar perfiles',
+            introducePIN: 'Introduce tu PIN',
+            pinIncorrecto: 'PIN incorrecto. Inténtalo de nuevo.',
+            volver: '← Volver',
+            eligeAvatar: 'Elige un avatar',
+            avatarActualizado: 'Avatar actualizado',
+            usuarioCreado: 'Usuario "{name}" creado',
+            cargandoUsuarios: 'Cargando...',
+            errorCargandoUsuarios: 'Error al cargar usuarios',
+            sinUsuarios: 'No hay usuarios. Crea uno desde "Gestionar perfiles".',
+            anadirPIN: '+ PIN',
+            quitarPIN: '🔒 Quitar PIN',
+            pinEstablecido: 'PIN establecido',
+            pinEliminado: 'PIN eliminado'
+        },
+
+        presupuestos: {
+            titulo: 'Presupuesto del período',
+            gestionarLimites: 'Gestionar límites',
+            categoria: 'Categoría',
+            limite: 'Límite',
+            limitePeriodo: 'Límite período',
+            gastado: 'Gastado',
+            restante: 'Restante',
+            progreso: 'Progreso',
+            estado: 'Estado',
+            superado: '⚠️ Superado',
+            ok: '✓ OK',
+            sinPresupuestos: 'Sin presupuestos configurados. Haz clic en "Gestionar límites" para añadir.',
+            errorCargando: 'Error al cargar presupuestos.',
+            sinRango: 'Sin rango de fechas.'
         },
 
         // ===== DASHBOARD REAL =====

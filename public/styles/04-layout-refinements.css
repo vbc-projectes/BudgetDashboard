@@ -725,16 +725,44 @@ main {
     gap: var(--spacing-xs);
 }
 
-.ajustes-user h3 {
+.ajustes-section h3 {
     font-size: 1.05rem;
     display: flex;
     align-items: center;
     gap: var(--spacing-xs);
+    color: var(--text-primary);
+    margin: 0;
 }
 
-.ajustes-user-note {
+.ajustes-nota {
     color: var(--text-secondary);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.ajustes-user-name {
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: var(--primary);
+    margin: 0;
+}
+
+.ajustes-number-input {
+    width: 110px;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-medium);
+    border-radius: var(--border-radius-sm);
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    background: var(--bg-white);
+}
+
+.ajustes-backup-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    align-self: flex-start;
 }
 
 .metrics-overlay {

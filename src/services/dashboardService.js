@@ -8,6 +8,7 @@ const config = require('../config/config');
 const { dbAll, dbGet } = require('../utils/dbHelpers');
 const PuntualService = require('../services/PuntualService');
 const MensualService = require('../services/MensualService');
+const CuentaRemuneradaService = require('../services/CuentaRemuneradaService');
 const { 
     calcularInteresGenerado, 
     calcularInteresesMensuales,
@@ -223,14 +224,18 @@ async function getAhorrosMes(desde, hasta, categoria_id = null) {
     }
 
     const hastaDate = new Date(hasta);
-    const meses = generarArrayMeses(desde, hasta, { 
-        ingresos: 0, 
-        cuentas_remuneradas: 0, 
-        gastos: 0, 
-        impuestos_ingresos: 0, 
-        impuestos_otros: 0, 
+    const meses = generarArrayMeses(desde, hasta, {
+        ingresos: 0,
+        cuentas_remuneradas: 0,
+        gastos: 0,
+        impuestos_ingresos: 0,
+        impuestos_otros: 0,
         retencion_cr: 0,
-        ahorros: 0 
+        dividendos: 0,
+        dividendos_ret: 0,
+        ingresos_bolsa: 0,
+        gastos_bolsa: 0,
+        ahorros: 0
     });
 
     // Ingresos
@@ -240,16 +245,36 @@ async function getAhorrosMes(desde, hasta, categoria_id = null) {
     const ingresosM = await ingresosMensualesService.getAllForCalculations(categoria_id);
     agregarMensualesPorMes(ingresosM, meses, hastaDate, 'ingresos');
 
-    // Cuenta remunerada
-    const cuentasRemuneradas = await dbAll(db, "SELECT monto, aportacion_mensual, interes, retencion, desde, hasta FROM cuenta_remunerada");
+    // ── Cuenta remunerada: interés real (simulación diaria) para la cuenta principal ──
+    const crService = new CuentaRemuneradaService();
+    const cuentaPrincipal = await dbGet(db,
+        `SELECT id FROM cuenta_remunerada WHERE linked_to_bolsa = 1 ORDER BY created_at LIMIT 1`
+    ) || await dbGet(db, `SELECT id FROM cuenta_remunerada ORDER BY created_at LIMIT 1`);
+    const idPrincipal = cuentaPrincipal?.id || null;
+
+    if (idPrincipal) {
+        const interesesReales = await crService.getInteresesPorMes(desde, hasta);
+        meses.forEach(m => {
+            const cr = interesesReales[m.mes];
+            if (cr && cr.bruto > 0) {
+                m.cuentas_remuneradas += cr.bruto;
+                const ret = cr.bruto - cr.neto;
+                if (ret > 0) { m.impuestos_ingresos += ret; m.retencion_cr += ret; }
+            }
+        });
+    }
+
+    // Cuentas secundarias (no principal): fórmula simple
     const hastaSliceCR = hasta.slice(0, 7);
-    cuentasRemuneradas.forEach(cr => {
-        const interesesMensuales = calcularInteresesMensuales(cr.monto, cr.aportacion_mensual || 0, cr.interes || 0, cr.desde, cr.hasta || hastaSliceCR);
+    const cuentasSecundarias = idPrincipal
+        ? await dbAll(db, `SELECT monto, aportacion_mensual, interes, retencion, desde, hasta FROM cuenta_remunerada WHERE id != ?`, [idPrincipal])
+        : [];
+    cuentasSecundarias.forEach(cr => {
+        const im = calcularInteresesMensuales(cr.monto, cr.aportacion_mensual || 0, cr.interes || 0, cr.desde, cr.hasta || hastaSliceCR);
         meses.forEach(m => {
             if (esMensualActivo(m.mes, hastaDate, cr.desde, cr.hasta)) {
-                const interMes = interesesMensuales[m.mes] || 0;
+                const interMes = im[m.mes] || 0;
                 m.cuentas_remuneradas += interMes;
-                // Retención sobre intereses de cuenta remunerada -> impuestos sobre ingresos
                 if (cr.retencion && cr.retencion > 0) {
                     const ret = interMes * (cr.retencion / 100);
                     m.impuestos_ingresos += ret;
@@ -258,6 +283,44 @@ async function getAhorrosMes(desde, hasta, categoria_id = null) {
             }
         });
     });
+
+    // ── Dividendos de bolsa ──
+    const dividendosBolsa = await dbAll(db,
+        `SELECT fecha, importe_bruto, retencion FROM dividendos WHERE fecha >= ? AND fecha <= ? ORDER BY fecha ASC`,
+        [desde, hasta]
+    );
+    dividendosBolsa.forEach(div => {
+        const mes = (div.fecha || '').slice(0, 7);
+        const mesData = meses.find(m => m.mes === mes);
+        if (!mesData) return;
+        const bruto = parseFloat(div.importe_bruto) || 0;
+        const ret   = parseFloat(div.retencion)     || 0;
+        const neto  = bruto - ret;
+        mesData.dividendos     += neto;
+        mesData.dividendos_ret += ret;
+        if (ret > 0) mesData.impuestos_ingresos += ret;
+    });
+
+    // ── Operaciones de bolsa (solo si NO hay CR vinculada — evita doble cómputo) ──
+    const tieneLinkedCR = await dbGet(db, `SELECT id FROM cuenta_remunerada WHERE linked_to_bolsa = 1 LIMIT 1`);
+    if (!tieneLinkedCR) {
+        const opsBolsa = await dbAll(db,
+            `SELECT fecha, tipo, cantidad, precio_unitario, comision FROM operaciones_bolsa WHERE fecha >= ? AND fecha <= ? ORDER BY fecha ASC`,
+            [desde, hasta]
+        );
+        opsBolsa.forEach(op => {
+            const mes = (op.fecha || '').slice(0, 7);
+            const mesData = meses.find(m => m.mes === mes);
+            if (!mesData) return;
+            const importe = parseFloat(op.cantidad) * parseFloat(op.precio_unitario);
+            const comision = parseFloat(op.comision || 0);
+            if (op.tipo === 'compra') {
+                mesData.gastos_bolsa += importe + comision;
+            } else {
+                mesData.ingresos_bolsa += importe - comision;
+            }
+        });
+    }
 
     // Gastos puntuales (sin IPC)
     const gastosP = await gastosPuntualesService.getByMonth(desde, hasta, categoria_id);
@@ -308,24 +371,25 @@ async function getAhorrosMes(desde, hasta, categoria_id = null) {
     `);
     agregarMensualesPorMes(impuestosM, meses, hastaDate, 'impuestos_otros');
 
-    // Métricas contables consistentes por mes
-    // total_ingreso: neto + renta + cuenta remunerada bruta
-    // ingresos_netos: total_ingreso - impuesto_renta
-    // ahorro: total_ingreso - total_gastos - impuesto_renta - impuesto_otros
+    // Métricas contables — total_ingreso incluye todo el ingreso bruto:
+    //   salary + cr_interest_bruto + dividendos_bruto + bolsa_ventas_neto
+    // ahorros = total_ingreso - gastos_total - impuestos
     meses.forEach(m => {
-        const totalIngreso = (m.ingresos || 0) + (m.impuestos_ingresos || 0) + (m.cuentas_remuneradas || 0);
         const impuestoRenta = (m.impuestos_ingresos || 0);
         const impuestoOtros = (m.impuestos_otros || 0);
-        const totalGastos = (m.gastos || 0);
-        const ingresosNetos = totalIngreso - impuestoRenta;
+        // dividendos_bruto = neto + retención (la retención ya está en impuestos_ingresos)
+        const dividendosBruto = (m.dividendos || 0) + (m.dividendos_ret || 0);
+        const totalIngreso = (m.ingresos || 0) + impuestoRenta + (m.cuentas_remuneradas || 0)
+            + dividendosBruto + (m.ingresos_bolsa || 0);
+        const totalGastos  = (m.gastos || 0) + (m.gastos_bolsa || 0);
         const ahorro = totalIngreso - totalGastos - impuestoRenta - impuestoOtros;
 
-        m.total_ingreso = totalIngreso;
-        m.ingresos_netos = ingresosNetos;
-        m.total_gastos = totalGastos;
+        m.total_ingreso  = totalIngreso;
+        m.ingresos_netos = totalIngreso - impuestoRenta;
+        m.total_gastos   = totalGastos;
         m.impuesto_renta = impuestoRenta;
         m.impuesto_otros = impuestoOtros;
-        m.ahorros = ahorro;
+        m.ahorros        = ahorro;
     });
 
     return meses;
@@ -345,6 +409,11 @@ async function getAhorrosMesReal(desde, hasta, categoria_id = null) {
         gastos: 0,
         impuestos_ingresos: 0,
         impuestos_otros: 0,
+        retencion_cr: 0,
+        dividendos: 0,
+        dividendos_ret: 0,
+        ingresos_bolsa: 0,
+        gastos_bolsa: 0,
         ahorros: 0
     });
 
@@ -354,20 +423,71 @@ async function getAhorrosMesReal(desde, hasta, categoria_id = null) {
     const gastosP = await gastosRealesService.getByMonth(desde, hasta, categoria_id);
     agregarPuntualesPorMes(gastosP, meses, 'gastos');
 
-    meses.forEach(m => {
-        const totalIngreso = (m.ingresos || 0) + (m.impuestos_ingresos || 0) + (m.cuentas_remuneradas || 0);
-        const impuestoRenta = (m.impuestos_ingresos || 0);
-        const impuestoOtros = (m.impuestos_otros || 0);
-        const totalGastos = (m.gastos || 0);
-        const ingresosNetos = totalIngreso - impuestoRenta;
-        const ahorro = totalIngreso - totalGastos - impuestoRenta - impuestoOtros;
+    // CR interés real
+    const crServiceR = new CuentaRemuneradaService();
+    const cuentaPrinR = await dbGet(db,
+        `SELECT id FROM cuenta_remunerada WHERE linked_to_bolsa = 1 ORDER BY created_at LIMIT 1`
+    ) || await dbGet(db, `SELECT id FROM cuenta_remunerada ORDER BY created_at LIMIT 1`);
+    if (cuentaPrinR?.id) {
+        const irR = await crServiceR.getInteresesPorMes(desde, hasta);
+        meses.forEach(m => {
+            const cr = irR[m.mes];
+            if (cr && cr.bruto > 0) {
+                m.cuentas_remuneradas += cr.bruto;
+                const ret = cr.bruto - cr.neto;
+                if (ret > 0) { m.impuestos_ingresos += ret; m.retencion_cr += ret; }
+            }
+        });
+    }
 
-        m.total_ingreso = totalIngreso;
-        m.ingresos_netos = ingresosNetos;
-        m.total_gastos = totalGastos;
+    // Dividendos
+    const divsR = await dbAll(db,
+        `SELECT fecha, importe_bruto, retencion FROM dividendos WHERE fecha >= ? AND fecha <= ?`,
+        [desde, hasta]
+    );
+    divsR.forEach(div => {
+        const mes = (div.fecha || '').slice(0, 7);
+        const md  = meses.find(m => m.mes === mes);
+        if (!md) return;
+        const bruto = parseFloat(div.importe_bruto) || 0;
+        const ret   = parseFloat(div.retencion)     || 0;
+        md.dividendos     += bruto - ret;
+        md.dividendos_ret += ret;
+        if (ret > 0) md.impuestos_ingresos += ret;
+    });
+
+    // Ops de bolsa (solo si no hay CR vinculada)
+    const linkedR = await dbGet(db, `SELECT id FROM cuenta_remunerada WHERE linked_to_bolsa = 1 LIMIT 1`);
+    if (!linkedR) {
+        const opsR = await dbAll(db,
+            `SELECT fecha, tipo, cantidad, precio_unitario, comision FROM operaciones_bolsa WHERE fecha >= ? AND fecha <= ?`,
+            [desde, hasta]
+        );
+        opsR.forEach(op => {
+            const mes = (op.fecha || '').slice(0, 7);
+            const md  = meses.find(m => m.mes === mes);
+            if (!md) return;
+            const imp = parseFloat(op.cantidad) * parseFloat(op.precio_unitario);
+            const com = parseFloat(op.comision || 0);
+            if (op.tipo === 'compra') md.gastos_bolsa   += imp + com;
+            else                      md.ingresos_bolsa += imp - com;
+        });
+    }
+
+    meses.forEach(m => {
+        const impuestoRenta  = (m.impuestos_ingresos || 0);
+        const impuestoOtros  = (m.impuestos_otros    || 0);
+        const dividendosBruto = (m.dividendos || 0) + (m.dividendos_ret || 0);
+        const totalIngreso = (m.ingresos || 0) + impuestoRenta + (m.cuentas_remuneradas || 0)
+            + dividendosBruto + (m.ingresos_bolsa || 0);
+        const totalGastos  = (m.gastos || 0) + (m.gastos_bolsa || 0);
+
+        m.total_ingreso  = totalIngreso;
+        m.ingresos_netos = totalIngreso - impuestoRenta;
+        m.total_gastos   = totalGastos;
         m.impuesto_renta = impuestoRenta;
         m.impuesto_otros = impuestoOtros;
-        m.ahorros = ahorro;
+        m.ahorros        = totalIngreso - totalGastos - impuestoRenta - impuestoOtros;
     });
 
     return meses;
@@ -815,15 +935,30 @@ async function getNetWorth() {
     };
 }
 
-async function getPresupuestosConGasto(mes) {
-    const mesFiltro = mes || (() => {
-        const hoy = new Date();
-        return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
-    })();
-    const desdeStr = `${mesFiltro}-01`;
-    const hastaStr = `${mesFiltro}-31`;
+async function getPresupuestosConGasto(mes, desde, hasta) {
+    // Resolve date range — prefer explicit desde/hasta, fall back to single month
+    let desdeStr, hastaStr, desdesMes, hastasMes, numMeses;
 
-    // presupuestos_categoria may not exist on DBs that haven't run M019 yet
+    if (desde && hasta) {
+        desdeStr  = desde;
+        hastaStr  = hasta;
+        desdesMes = desde.slice(0, 7);
+        hastasMes = hasta.slice(0, 7);
+        const [sy, sm] = desdesMes.split('-').map(Number);
+        const [ey, em] = hastasMes.split('-').map(Number);
+        numMeses = (ey - sy) * 12 + (em - sm) + 1;
+    } else {
+        const mesFiltro = mes || (() => {
+            const hoy = new Date();
+            return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+        })();
+        desdeStr  = `${mesFiltro}-01`;
+        hastaStr  = `${mesFiltro}-31`;
+        desdesMes = mesFiltro;
+        hastasMes = mesFiltro;
+        numMeses  = 1;
+    }
+
     let presupuestos;
     try {
         presupuestos = await dbAll(db, `
@@ -836,34 +971,51 @@ async function getPresupuestosConGasto(mes) {
         return [];
     }
 
-    const [gastosPunt, gastosMens] = await Promise.all([
-        dbAll(db, `
-            SELECT categoria_id, IFNULL(SUM(monto),0) AS total
-            FROM gastos_puntuales WHERE fecha >= ? AND fecha <= ?
-            GROUP BY categoria_id
-        `, [desdeStr, hastaStr]),
-        dbAll(db, `
-            SELECT categoria_id, IFNULL(SUM(monto),0) AS total
-            FROM gastos_mensuales WHERE desde <= ? AND hasta >= ?
-            GROUP BY categoria_id
-        `, [mesFiltro, mesFiltro])
-    ]);
+    // Gastos puntuales: suma directa del rango
+    const gastosPunt = await dbAll(db, `
+        SELECT categoria_id, IFNULL(SUM(monto),0) AS total
+        FROM gastos_puntuales WHERE fecha >= ? AND fecha <= ?
+        GROUP BY categoria_id
+    `, [desdeStr, hastaStr]);
+
+    // Gastos mensuales: contar meses de solapamiento × monto
+    const gastosMensRows = await dbAll(db, `
+        SELECT categoria_id, monto, desde, hasta
+        FROM gastos_mensuales
+        WHERE desde <= ? AND (hasta >= ? OR hasta = '9999-12')
+    `, [hastasMes, desdesMes]);
 
     const gastoMap = {};
-    for (const g of gastosPunt) gastoMap[g.categoria_id] = (gastoMap[g.categoria_id] || 0) + g.total;
-    for (const g of gastosMens) gastoMap[g.categoria_id] = (gastoMap[g.categoria_id] || 0) + g.total;
+    for (const g of gastosPunt) {
+        gastoMap[g.categoria_id] = (gastoMap[g.categoria_id] || 0) + g.total;
+    }
+    for (const gm of gastosMensRows) {
+        const gmHasta      = gm.hasta === '9999-12' ? hastasMes : gm.hasta;
+        const overlapStart = gm.desde  > desdesMes  ? gm.desde  : desdesMes;
+        const overlapEnd   = gmHasta   < hastasMes  ? gmHasta   : hastasMes;
+        if (overlapStart > overlapEnd) continue;
+        const [sy, sm] = overlapStart.split('-').map(Number);
+        const [ey, em] = overlapEnd.split('-').map(Number);
+        const months = (ey - sy) * 12 + (em - sm) + 1;
+        gastoMap[gm.categoria_id] = (gastoMap[gm.categoria_id] || 0) + gm.monto * months;
+    }
 
     return presupuestos.map(p => {
-        const gasto_real = Math.round((gastoMap[p.categoria_id] || 0) * 100) / 100;
-        const pct = p.limite_mensual > 0 ? Math.round(gasto_real / p.limite_mensual * 10000) / 100 : 0;
+        const limite_periodo = Math.round(p.limite_mensual * numMeses * 100) / 100;
+        const gasto_real     = Math.round((gastoMap[p.categoria_id] || 0) * 100) / 100;
+        const pct            = limite_periodo > 0
+            ? Math.round(gasto_real / limite_periodo * 10000) / 100
+            : 0;
         return {
             id:             p.id,
             categoria_id:   p.categoria_id,
             categoria:      p.categoria,
             limite_mensual: p.limite_mensual,
+            limite_periodo,
+            num_meses:      numMeses,
             gasto_real,
             porcentaje:     pct,
-            superado:       gasto_real > p.limite_mensual
+            superado:       gasto_real > limite_periodo
         };
     });
 }

@@ -591,6 +591,111 @@ async function renderInicioInsights() {
     renderInicioCategorias(categoriasData?.gastos || {});
     renderInicioDeltas(ahorrosMesClipped, ahorrosPrevClipped);
     renderInicioProximosGastos(gastosPuntuales, _desdeRange, _hastaRange);
+    renderInicioPresupuestos(_desdeRange, _hastaRange);
+}
+
+// Helper i18n para finance-home
+function _tFH(key, fallback) {
+    try { return gestorIdiomas.obtenerTexto(key) || fallback; } catch (_) { return fallback; }
+}
+
+// ===== PRESUPUESTOS EN INICIO =====
+async function renderInicioPresupuestos(desde, hasta) {
+    const container = document.getElementById('inicio-presupuestos-table');
+    const subtitle  = document.getElementById('inicio-presupuestos-subtitle');
+    if (!container) return;
+
+    if (subtitle) subtitle.textContent = getPeriodLabel(periodoActual);
+
+    // Wire "Gestionar límites" button (idempotent)
+    const gBtn = document.getElementById('inicio-gestionar-presup-btn');
+    if (gBtn && !gBtn.dataset.listenerAdded) {
+        gBtn.dataset.listenerAdded = '1';
+        if (gBtn.querySelector('span[data-text]') || !gBtn.querySelector('i+span')) {
+            const span = gBtn.querySelector('span');
+            if (span) span.textContent = _tFH('presupuestos.gestionarLimites', 'Gestionar límites');
+        }
+        gBtn.addEventListener('click', function () {
+            if (window._dashExt && window._dashExt.openPresupuestosEditor) {
+                window._dashExt.openPresupuestosEditor();
+            }
+        });
+    }
+
+    if (!desde || !hasta) {
+        container.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem;margin:0;">' + _tFH('presupuestos.sinRango','Sin rango de fechas.') + '</p>';
+        return;
+    }
+
+    try {
+        const res  = await fetch(`/dashboard/presupuestos?desde=${desde}&hasta=${hasta}`);
+        const data = res.ok ? await res.json() : [];
+
+        if (!data.length) {
+            container.innerHTML =
+                '<p style="color:var(--text-secondary);font-size:0.85rem;margin:0;">' +
+                _tFH('presupuestos.sinPresupuestos','Sin presupuestos configurados.') + '</p>';
+            return;
+        }
+
+        const fmt = (v) => v == null || isNaN(v) ? '—'
+            : new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v);
+
+        const rows = data.map(function (item, idx) {
+            const realPct = item.porcentaje || 0;
+            const barPct  = Math.min(100, realPct);
+            const color   = realPct >= 100 ? 'var(--danger,#ef4444)'
+                          : realPct >= 80  ? 'var(--warning,#eab308)'
+                          :                  'var(--success,#22c55e)';
+            const colorBg = realPct >= 100 ? 'rgba(239,68,68,0.09)'
+                          : realPct >= 80  ? 'rgba(234,179,8,0.09)'
+                          :                  'rgba(34,197,94,0.09)';
+            const restante      = (item.limite_periodo || 0) - (item.gasto_real || 0);
+            const restanteColor = restante < 0 ? 'var(--danger,#ef4444)' : 'var(--success,#22c55e)';
+            const rowBg         = idx % 2 === 1 ? 'background:var(--gray-50,#f9fafb);' : '';
+
+            // Límite: total en línea principal + fórmula en texto pequeño debajo
+            const limiteMain = '<span style="font-weight:600;">' + fmt(item.limite_periodo) + '</span>';
+            const limiteHint = item.num_meses > 1
+                ? '<div style="font-size:0.74rem;color:var(--text-tertiary,#94a3b8);margin-top:1px;">' +
+                  fmt(item.limite_mensual) + '/mes × ' + item.num_meses + '</div>'
+                : '';
+
+            // Estado: badge con % + icono fusionados
+            const pctTxt   = realPct > 999 ? '>999%' : realPct.toFixed(0) + '%';
+            const icono    = item.superado ? ' ⚠' : ' ✓';
+            const badge    = '<span style="display:inline-flex;align-items:center;background:' + colorBg + ';' +
+                'color:' + color + ';border-radius:999px;padding:3px 10px;' +
+                'font-size:0.8rem;font-weight:700;white-space:nowrap;">' +
+                pctTxt + icono + '</span>';
+
+            return '<tr style="' + rowBg + '">' +
+                '<td style="padding:8px 10px;font-weight:500;white-space:nowrap;">' + (item.categoria || '') + '</td>' +
+                '<td style="text-align:right;padding:8px 10px;">' + limiteMain + limiteHint + '</td>' +
+                '<td style="text-align:right;padding:8px 10px;">' + fmt(item.gasto_real) + '</td>' +
+                '<td style="text-align:right;padding:8px 10px;font-weight:600;color:' + restanteColor + ';">' + fmt(restante) + '</td>' +
+                '<td style="padding:8px 10px;min-width:110px;">' +
+                    '<div style="background:var(--border-light,#e2e8f0);border-radius:6px;height:10px;overflow:hidden;">' +
+                    '<div style="height:10px;border-radius:6px;background:' + color + ';width:' + barPct + '%;transition:width 0.4s ease;"></div>' +
+                    '</div></td>' +
+                '<td style="padding:8px 10px;">' + badge + '</td>' +
+                '</tr>';
+        }).join('');
+
+        var thStyle = 'padding:6px 10px;font-size:0.75rem;letter-spacing:.04em;text-transform:uppercase;color:var(--text-tertiary,#64748b);';
+        container.innerHTML =
+            '<table style="width:100%;border-collapse:collapse;font-size:0.87rem;">' +
+            '<thead><tr style="border-bottom:2px solid var(--border-light,#e2e8f0);">' +
+            '<th style="text-align:left;' + thStyle + '">' + _tFH('presupuestos.categoria','Categoría') + '</th>' +
+            '<th style="text-align:right;' + thStyle + '">' + _tFH('presupuestos.limite','Límite') + '</th>' +
+            '<th style="text-align:right;' + thStyle + '">' + _tFH('presupuestos.gastado','Gastado') + '</th>' +
+            '<th style="text-align:right;' + thStyle + '">' + _tFH('presupuestos.restante','Restante') + '</th>' +
+            '<th style="' + thStyle + '">' + _tFH('presupuestos.progreso','Progreso') + '</th>' +
+            '<th style="' + thStyle + '">' + _tFH('presupuestos.estado','Estado') + '</th>' +
+            '</tr></thead><tbody>' + rows + '</tbody></table>';
+    } catch (_) {
+        container.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem;margin:0;">' + _tFH('presupuestos.errorCargando','Error cargando presupuestos.') + '</p>';
+    }
 }
 
 function initInicio() {

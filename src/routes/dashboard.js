@@ -77,7 +77,9 @@ router.get('/dashboard/net-worth', async (req, res, next) => {
 });
 
 router.get('/dashboard/presupuestos', async (req, res, next) => {
-    try { res.json(await getPresupuestosConGasto(req.query.mes)); } catch (err) { next(err); }
+    try {
+        res.json(await getPresupuestosConGasto(req.query.mes, req.query.desde, req.query.hasta));
+    } catch (err) { next(err); }
 });
 
 router.get('/dashboard/anomalias', async (req, res, next) => {

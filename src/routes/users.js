@@ -14,7 +14,11 @@ const {
     readLastUser,
     saveLastUser,
     readUserProfile,
-    setUserIcon
+    setUserIcon,
+    hasUserPin,
+    setUserPin,
+    removeUserPin,
+    verifyUserPin
 } = require('../config/userManager');
 
 const router = express.Router();
@@ -67,6 +71,38 @@ router.post('/users/icon', async (req, res, next) => {
         ensureUserFolders(name);
         const profile = setUserIcon(name, icon);
         res.json({ success: true, profile });
+    } catch (err) { next(err); }
+});
+
+router.get('/users/has-pin', (req, res, next) => {
+    try {
+        const name = normalizeUserName(req.query?.name);
+        res.json({ hasPin: hasUserPin(name) });
+    } catch (err) { next(err); }
+});
+
+router.post('/users/verify-pin', (req, res, next) => {
+    try {
+        const name = normalizeUserName(req.body?.name);
+        const pin = String(req.body?.pin ?? '');
+        res.json({ success: verifyUserPin(name, pin) });
+    } catch (err) { next(err); }
+});
+
+router.post('/users/set-pin', (req, res, next) => {
+    try {
+        const name = normalizeUserName(req.body?.name);
+        const pin = String(req.body?.pin ?? '');
+        setUserPin(name, pin);
+        res.json({ success: true });
+    } catch (err) { next(err); }
+});
+
+router.post('/users/remove-pin', (req, res, next) => {
+    try {
+        const name = normalizeUserName(req.body?.name);
+        removeUserPin(name);
+        res.json({ success: true });
     } catch (err) { next(err); }
 });
 

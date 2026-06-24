@@ -39,12 +39,14 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', routes);
 
 // ── SPA fallback: serve index.html for any non-API GET ───────────────
+const API_PREFIXES = [
+    '/api/', '/add/', '/update/', '/delete/', '/import/', '/sell/',
+    '/widget/', '/users/', '/dashboard', '/ahorros', '/categorias',
+    '/gastos', '/ingresos', '/impuestos', '/presupuestos', '/bolsa',
+    '/cuenta', '/sub_huchas', '/hucha', '/backup', '/assets',
+];
 app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api/') || req.path.startsWith('/add/') ||
-        req.path.startsWith('/update/') || req.path.startsWith('/delete/') ||
-        req.path.startsWith('/import/') || req.path.startsWith('/sell/')) {
-        return next();
-    }
+    if (API_PREFIXES.some(p => req.path.startsWith(p))) return next();
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 

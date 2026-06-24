@@ -154,7 +154,12 @@ TRADUCCIONES.en = {
                 titulo: 'Settings',
                 descripcion: 'Configure theme, language and working currency',
                 usuarioActivo: 'Active user',
-                cambiarUsuarioSidebar: 'You can switch users from the sidebar button.'
+                cambiarUsuarioSidebar: 'You can switch users from the profile selector.',
+                retencionDividendos: 'Dividend retention (%):',
+                retencionDividendosNota: 'Applied automatically to all dividends without their own retention.',
+                copiaSeguridad: 'Backup',
+                copiaDescripcion: 'Download a copy of your SQLite database.',
+                descargarBackup: 'Download backup'
         },
 
         usuarios: {
@@ -167,7 +172,39 @@ TRADUCCIONES.en = {
             placeholderNombre: 'Name',
             crear: 'Create',
             refrescar: 'Refresh',
-            sinUsuario: 'No user'
+            sinUsuario: 'No user',
+            quienEres: 'Who are you?',
+            gestionarPerfiles: 'Manage profiles',
+            introducePIN: 'Enter your PIN',
+            pinIncorrecto: 'Incorrect PIN. Please try again.',
+            volver: '← Back',
+            eligeAvatar: 'Choose an avatar',
+            avatarActualizado: 'Avatar updated',
+            usuarioCreado: 'User "{name}" created',
+            cargandoUsuarios: 'Loading...',
+            errorCargandoUsuarios: 'Error loading users',
+            sinUsuarios: 'No users. Create one from "Manage profiles".',
+            anadirPIN: '+ PIN',
+            quitarPIN: '🔒 Remove PIN',
+            pinEstablecido: 'PIN set',
+            pinEliminado: 'PIN removed'
+        },
+
+        presupuestos: {
+            titulo: 'Period budget',
+            gestionarLimites: 'Manage limits',
+            categoria: 'Category',
+            limite: 'Limit',
+            limitePeriodo: 'Period limit',
+            gastado: 'Spent',
+            restante: 'Remaining',
+            progreso: 'Progress',
+            estado: 'Status',
+            superado: '⚠️ Exceeded',
+            ok: '✓ OK',
+            sinPresupuestos: 'No budgets configured. Click "Manage limits" to add.',
+            errorCargando: 'Error loading budgets.',
+            sinRango: 'No date range.'
         },
 
         // ===== IMPORTACIÓN BANCARIA =====

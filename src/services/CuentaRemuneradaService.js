@@ -22,10 +22,21 @@ class CuentaRemuneradaService {
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
 
-    /** Normaliza un valor de fecha (YYYY-MM o YYYY-MM-DD) a YYYY-MM-DD */
+    /** Normaliza un valor de fecha inicio (YYYY-MM → primer día del mes) */
     static _parseDate(val, fallback) {
         if (!val) return fallback;
         return /^\d{4}-\d{2}$/.test(val) ? val + '-01' : val.slice(0, 10);
+    }
+
+    /** Normaliza un valor de fecha fin (YYYY-MM → último día del mes, no el primero) */
+    static _parseDateEnd(val, fallback) {
+        if (!val) return fallback;
+        if (/^\d{4}-\d{2}$/.test(val)) {
+            const [y, m] = val.split('-').map(Number);
+            const lastDay = new Date(y, m, 0).getDate();
+            return `${val}-${String(lastDay).padStart(2, '0')}`;
+        }
+        return val.slice(0, 10);
     }
 
     /**
@@ -60,7 +71,7 @@ class CuentaRemuneradaService {
         const toLD = CuentaRemuneradaService._toLocalDateStr;
 
         const fechaInicio = CuentaRemuneradaService._parseDate(cuenta.desde, hoy.slice(0, 7) + '-01');
-        const fechaFin    = CuentaRemuneradaService._parseDate(cuenta.hasta, hoy);
+        const fechaFin    = CuentaRemuneradaService._parseDateEnd(cuenta.hasta, hoy);
 
         // Operaciones de bolsa → mapa de flujo de efectivo neto por fecha
         const ops = await dbAll(db,
@@ -213,11 +224,13 @@ class CuentaRemuneradaService {
             cuenta,
             saldoSeries,
             saldoHoy:    saldoHoyVal,
-            saldoActual: saldoHoyVal, // alias backward-compatible con código anterior
+            saldoActual: saldoHoyVal,
             saldoInvertido,
             interesAcumuladoBruto,
             interesAcumuladoNeto,
-            tasaAnualEfectiva: tasaAnual  // tasa nominal de la CR
+            tasaAnualEfectiva: tasaAnual,
+            ajustes:      (ajustesRows  || []).map(a => ({ fecha: (a.fecha || '').slice(0, 10), saldo: parseFloat(a.saldo) })),
+            tiposInteres: (tiposInteres || []).map(t => ({ desde: (t.desde || '').slice(0, 7), interes: parseFloat(t.interes) }))
         };
     }
 
@@ -235,7 +248,7 @@ class CuentaRemuneradaService {
         const _now = new Date();
         const hoy  = toLD(_now);
         const fechaInicio = CuentaRemuneradaService._parseDate(cuenta.desde, hoy.slice(0, 7) + '-01');
-        const fechaFin    = CuentaRemuneradaService._parseDate(cuenta.hasta, hoy);
+        const fechaFin    = CuentaRemuneradaService._parseDateEnd(cuenta.hasta, hoy);
         const endForHoy   = fechaFin < hoy ? fechaFin : hoy;
 
         const retencion = parseFloat(cuenta.retencion) || 0;
@@ -340,6 +353,119 @@ class CuentaRemuneradaService {
             interesAcumuladoNeto:  r.interesAcumuladoNeto,
             tasaAnualEfectiva:     r.tasaAnualEfectiva
         };
+    }
+
+    /**
+     * Devuelve el interés real (simulado día a día) desglosado por mes.
+     * Tiene en cuenta: tasa variable, aportaciones variables, ajustes manuales,
+     * operaciones de bolsa y dividendos que modifican el saldo base.
+     * @param {string} desde  YYYY-MM-DD
+     * @param {string} hasta  YYYY-MM-DD
+     * @returns {Promise<Object>} { 'YYYY-MM': { bruto, neto } }
+     */
+    async getInteresesPorMes(desde, hasta) {
+        let cuenta = await dbGet(db,
+            `SELECT * FROM cuenta_remunerada WHERE linked_to_bolsa = 1 ORDER BY created_at LIMIT 1`
+        );
+        if (!cuenta) cuenta = await dbGet(db, `SELECT * FROM cuenta_remunerada ORDER BY created_at LIMIT 1`);
+        if (!cuenta) return {};
+
+        const toLD = CuentaRemuneradaService._toLocalDateStr;
+        const hoy  = toLD(new Date());
+        const fechaInicio = CuentaRemuneradaService._parseDate(cuenta.desde, hoy.slice(0, 7) + '-01');
+        const fechaFin    = CuentaRemuneradaService._parseDateEnd(cuenta.hasta, hoy);
+        const endForHoy   = fechaFin < hoy ? fechaFin : hoy;
+        const simEnd      = hasta > endForHoy ? endForHoy : hasta;
+        if (fechaInicio > simEnd) return {};
+
+        const retencion = parseFloat(cuenta.retencion) || 0;
+        const tasaBase  = parseFloat(cuenta.interes)   || 0;
+
+        const [ops, dividendos, aportaciones, ajustesRows, tiposInteres] = await Promise.all([
+            dbAll(db, `SELECT fecha, tipo, cantidad, precio_unitario, comision FROM operaciones_bolsa ORDER BY fecha ASC`),
+            dbAll(db, `SELECT fecha, importe_bruto, retencion FROM dividendos ORDER BY fecha ASC`),
+            dbAll(db, `SELECT desde, cantidad FROM cuenta_remunerada_aportaciones WHERE cuenta_id = ? ORDER BY desde ASC`, [cuenta.id]),
+            dbAll(db, `SELECT fecha, saldo FROM cuenta_remunerada_ajustes WHERE cuenta_id = ? ORDER BY fecha ASC`, [cuenta.id]),
+            dbAll(db, `SELECT desde, interes FROM historial_tipos_interes WHERE cuenta_remunerada_id = ? ORDER BY desde ASC`, [cuenta.id])
+        ]);
+
+        const movByDate = {};
+        for (const op of ops) {
+            const f = (op.fecha || '').slice(0, 10);
+            if (!movByDate[f]) movByDate[f] = 0;
+            const importe = parseFloat(op.cantidad) * parseFloat(op.precio_unitario) + parseFloat(op.comision || 0);
+            if (op.tipo === 'compra') {
+                movByDate[f] -= importe;
+            } else {
+                movByDate[f] += parseFloat(op.cantidad) * parseFloat(op.precio_unitario) - parseFloat(op.comision || 0);
+            }
+        }
+
+        const divByDate = {};
+        for (const div of (dividendos || [])) {
+            const f = (div.fecha || '').slice(0, 10);
+            const bruto = parseFloat(div.importe_bruto) || 0;
+            const ret   = parseFloat(div.retencion)     || 0;
+            const neto  = bruto - ret;
+            if (neto > 0) divByDate[f] = (divByDate[f] || 0) + neto;
+        }
+
+        const ajusteByFecha = new Map((ajustesRows || []).map(a => [a.fecha.slice(0, 10), parseFloat(a.saldo)]));
+
+        function tasaEfectiva(fechaStr) {
+            let tasa = tasaBase;
+            for (const t of (tiposInteres || [])) {
+                if (t.desde <= fechaStr) tasa = parseFloat(t.interes);
+                else break;
+            }
+            return tasa;
+        }
+
+        function aportacionEfectiva(fechaStr) {
+            let valor = parseFloat(cuenta.aportacion_mensual) || 0;
+            for (const ap of (aportaciones || [])) {
+                if (ap.desde <= fechaStr) valor = parseFloat(ap.cantidad);
+                else break;
+            }
+            return valor;
+        }
+
+        let saldo = parseFloat(cuenta.monto) || 0;
+        const interesPorMes = {};
+
+        let current  = new Date(fechaInicio + 'T00:00:00');
+        const endDate = new Date(simEnd + 'T00:00:00');
+        let prevMonth = current.getMonth();
+
+        while (current <= endDate) {
+            const fechaStr = toLD(current);
+            const curMonth = current.getMonth();
+
+            if (fechaStr > fechaInicio && current.getDate() === 1 && curMonth !== prevMonth) {
+                saldo += aportacionEfectiva(fechaStr);
+            }
+            prevMonth = curMonth;
+
+            if (movByDate[fechaStr]) saldo += movByDate[fechaStr];
+            if (divByDate[fechaStr]) saldo += divByDate[fechaStr];
+            if (ajusteByFecha.has(fechaStr)) saldo = ajusteByFecha.get(fechaStr);
+
+            if (fechaStr >= desde && saldo > 0) {
+                const interDia = saldo * tasaEfectiva(fechaStr) / 100 / 365;
+                const mes = fechaStr.slice(0, 7);
+                if (!interesPorMes[mes]) interesPorMes[mes] = { bruto: 0, neto: 0 };
+                interesPorMes[mes].bruto += interDia;
+            }
+
+            current.setDate(current.getDate() + 1);
+        }
+
+        for (const v of Object.values(interesPorMes)) {
+            v.neto  = parseFloat((v.bruto * (1 - retencion / 100)).toFixed(4));
+            v.bruto = parseFloat(v.bruto.toFixed(4));
+        }
+
+        return interesPorMes;
     }
 }
 

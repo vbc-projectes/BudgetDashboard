@@ -109,55 +109,307 @@ body {
     outline-offset: 2px;
 }
 
-/* ==================== USUARIOS ==================== */
+/* ==================== USUARIOS (Netflix style) ==================== */
 .user-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(15, 23, 42, 0.55);
+    background: #141414;
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 9999;
-    backdrop-filter: blur(4px);
+    overflow-y: auto;
 }
 
-.user-overlay.hidden {
-    display: none;
-}
+.user-overlay.hidden { display: none; }
 
-.user-card {
-    background: var(--bg-white);
-    border-radius: var(--border-radius-lg);
-    padding: 2rem;
-    width: min(520px, 92vw);
-    box-shadow: var(--shadow-xl);
+/* Screens */
+.nf-screen {
     display: flex;
     flex-direction: column;
-    gap: 1.2rem;
-}
-
-.user-card h2 {
-    font-size: 1.4rem;
-    color: var(--dark);
-    margin-bottom: 0.4rem;
-}
-
-.user-row {
-    display: grid;
-    grid-template-columns: 1fr 2fr auto;
-    gap: 0.8rem;
     align-items: center;
+    gap: 1.8rem;
+    width: 100%;
+    max-width: 920px;
+    padding: 3rem 2rem 4rem;
+    animation: fadeIn 0.22s ease;
 }
 
-.user-row input,
-.user-row select {
-    padding: 0.6rem 0.8rem;
-    border: 1px solid var(--border-medium);
-    border-radius: var(--border-radius-sm);
+.nf-screen.hidden { display: none; }
+
+.nf-title {
+    color: #fff;
+    font-size: 2rem;
+    font-weight: 700;
+    text-align: center;
+    margin: 0;
+}
+
+/* Profile grid */
+.nf-profiles-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2rem;
+}
+
+.nf-profile-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.7rem;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+    width: 140px;
+    background: none;
+    border: none;
+    padding: 0;
+}
+
+.nf-profile-card:hover  { transform: scale(1.08); }
+.nf-profile-card:focus  { outline: none; transform: scale(1.08); }
+
+.nf-profile-avatar {
+    width: 120px;
+    height: 120px;
+    border-radius: 8px;
+    border: 3px solid transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3.4rem;
+    color: #fff;
+    transition: border-color 0.15s ease;
+}
+
+.nf-profile-card:hover .nf-profile-avatar,
+.nf-profile-card:focus .nf-profile-avatar { border-color: #fff; }
+
+.nf-profile-name {
+    color: #999;
     font-size: 0.95rem;
+    font-weight: 600;
+    text-align: center;
+    transition: color 0.15s ease;
 }
 
+.nf-profile-card:hover .nf-profile-name,
+.nf-profile-card:focus .nf-profile-name { color: #fff; }
 
+/* Avatar background colors (assigned by index) */
+.nf-av-0 { background: #16532e; }
+.nf-av-1 { background: #1a4e8b; }
+.nf-av-2 { background: #6b1b8b; }
+.nf-av-3 { background: #8b3a0e; }
+.nf-av-4 { background: #0e6b6b; }
+.nf-av-5 { background: #8b1a3a; }
+.nf-av-6 { background: #3a6b0e; }
+.nf-av-7 { background: #6b5a0e; }
+
+/* Footer */
+.nf-footer { margin-top: 0.5rem; }
+
+.nf-manage-btn {
+    background: transparent;
+    border: 1px solid #666;
+    color: #999;
+    padding: 0.5rem 1.6rem;
+    border-radius: 4px;
+    font-size: 0.88rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    letter-spacing: 0.03em;
+}
+
+.nf-manage-btn:hover { background: rgba(255,255,255,0.08); color: #fff; border-color: #fff; }
+
+/* ─── PIN screen ─── */
+.nf-pin-avatar {
+    width: 96px;
+    height: 96px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.8rem;
+    color: #fff;
+}
+
+.nf-pin-name  { color: #fff;  font-size: 1.3rem; font-weight: 700; margin: 0; }
+.nf-pin-label { color: #999;  font-size: 0.9rem;  margin: 0; }
+
+.nf-pin-dots {
+    display: flex;
+    gap: 18px;
+}
+
+.nf-pin-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid #777;
+    background: transparent;
+    transition: background 0.12s, border-color 0.12s;
+}
+
+.nf-pin-dot.filled { background: #fff; border-color: #fff; }
+
+.nf-pin-error { color: #e87c03; font-size: 0.88rem; text-align: center; margin: 0; }
+.nf-pin-error.hidden { display: none; }
+
+@keyframes pinShake {
+    0%,100% { transform: translateX(0); }
+    20%      { transform: translateX(-8px); }
+    60%      { transform: translateX(8px); }
+    80%      { transform: translateX(-4px); }
+}
+
+/* Numpad */
+.nf-numpad {
+    display: grid;
+    grid-template-columns: repeat(3, 72px);
+    gap: 14px;
+}
+
+.nf-numkey {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.22);
+    background: rgba(255,255,255,0.07);
+    color: #fff;
+    font-size: 1.4rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.12s, transform 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nf-numkey:hover  { background: rgba(255,255,255,0.18); }
+.nf-numkey:active { background: rgba(255,255,255,0.32); transform: scale(0.93); }
+.nf-numkey-empty  { pointer-events: none; border-color: transparent; background: transparent; }
+.nf-numkey-del    { font-size: 1.15rem; }
+
+.nf-back-btn {
+    background: transparent;
+    border: none;
+    color: #777;
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 0.5rem 1rem;
+    transition: color 0.15s;
+    margin-top: 0.5rem;
+}
+
+.nf-back-btn:hover { color: #fff; }
+
+/* ─── Manage screen ─── */
+.nf-manage-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    width: 100%;
+    max-width: 460px;
+}
+
+.nf-manage-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: rgba(255,255,255,0.05);
+    border-radius: 8px;
+    padding: 0.7rem 1rem;
+}
+
+.nf-manage-item-avatar {
+    width: 46px;
+    height: 46px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.35rem;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.nf-manage-item-name { color: #fff; font-weight: 600; flex: 1; font-size: 0.95rem; }
+
+.nf-manage-item-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+
+.nf-manage-icon-sel {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 4px;
+    color: #fff;
+    padding: 4px 6px;
+    font-size: 0.78rem;
+    cursor: pointer;
+}
+
+.nf-manage-icon-sel option { background: #1e1e1e; color: #fff; }
+
+.nf-pin-btn {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.25);
+    color: #ccc;
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.12s;
+}
+
+.nf-pin-btn:hover { background: rgba(255,255,255,0.12); color: #fff; border-color: rgba(255,255,255,0.5); }
+.nf-pin-btn.has-pin { color: #e87c03; border-color: #e87c03; }
+.nf-pin-btn.has-pin:hover { background: rgba(232,124,3,0.12); }
+
+.nf-manage-new {
+    width: 100%;
+    max-width: 460px;
+    padding: 1rem 1.2rem;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+}
+
+.nf-manage-new h3 {
+    color: #888;
+    font-size: 0.78rem;
+    font-weight: 700;
+    margin: 0 0 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+}
+
+.nf-manage-row { display: flex; gap: 0.75rem; }
+
+.nf-input {
+    flex: 1;
+    padding: 0.55rem 0.9rem;
+    background: rgba(255,255,255,0.09);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 4px;
+    color: #fff;
+    font-size: 0.93rem;
+    min-width: 0;
+}
+
+.nf-input::placeholder { color: rgba(255,255,255,0.35); }
+.nf-input:focus { outline: none; border-color: rgba(255,255,255,0.45); background: rgba(255,255,255,0.13); }
+
+.nf-pin-setup-form {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 0.5rem 0 0.2rem 3.6rem;
+    flex-wrap: wrap;
+}
+
+/* Legacy icon preview (usado en la barra principal) */
 .user-icon-preview {
     display: inline-flex;
     align-items: center;
@@ -170,31 +422,7 @@ body {
     color: var(--text-secondary);
 }
 
-.user-icon-preview i {
-    font-size: 1.05rem;
-}
-
-
-.user-divider {
-    text-align: center;
-    color: var(--text-tertiary);
-    font-weight: 600;
-}
-
-.user-actions {
-    display: flex;
-    justify-content: flex-end;
-}
-
-@media (max-width: 640px) {
-    .user-row {
-        grid-template-columns: 1fr;
-    }
-
-    .user-actions {
-        justify-content: center;
-    }
-}
+.user-icon-preview i { font-size: 1.05rem; }
 
 /* ==================== TRANSICIONES Y ANIMACIONES ==================== */
 @keyframes fadeIn {

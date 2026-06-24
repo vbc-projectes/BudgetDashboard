@@ -17,7 +17,11 @@ const {
     readLastUser,
     saveLastUser,
     readUserProfile,
-    setUserIcon
+    setUserIcon,
+    hasUserPin,
+    setUserPin,
+    removeUserPin,
+    verifyUserPin
 } = require('../config/userManager');
 
 // Services
@@ -243,12 +247,34 @@ function registerIpcHandlers() {
     safeHandle('set-user-icon', async (event, data) => {
         const name = normalizeUserName(data?.name);
         const icon = typeof data?.icon === 'string' ? data.icon.trim() : '';
-        if (!icon) {
-            throw new Error('Icono de usuario requerido');
-        }
+        if (!icon) throw new Error('Icono de usuario requerido');
         ensureUserFolders(name);
         const profile = setUserIcon(name, icon);
         return { success: true, profile };
+    });
+
+    safeHandle('has-user-pin', async (event, data) => {
+        const name = normalizeUserName(data?.name);
+        return { hasPin: hasUserPin(name) };
+    });
+
+    safeHandle('verify-user-pin', async (event, data) => {
+        const name = normalizeUserName(data?.name);
+        const pin = String(data?.pin ?? '');
+        return { success: verifyUserPin(name, pin) };
+    });
+
+    safeHandle('set-user-pin', async (event, data) => {
+        const name = normalizeUserName(data?.name);
+        const pin = String(data?.pin ?? '');
+        setUserPin(name, pin);
+        return { success: true };
+    });
+
+    safeHandle('remove-user-pin', async (event, data) => {
+        const name = normalizeUserName(data?.name);
+        removeUserPin(name);
+        return { success: true };
     });
 
     // ============= CATEGORIAS =============
@@ -1061,8 +1087,8 @@ function registerIpcHandlers() {
         return await getNetWorth();
     });
 
-    safeHandle('dashboard-get-presupuestos', async (event, mes) => {
-        return await getPresupuestosConGasto(mes);
+    safeHandle('dashboard-get-presupuestos', async (event, params) => {
+        return await getPresupuestosConGasto(params?.mes, params?.desde, params?.hasta);
     });
 
     safeHandle('dashboard-get-anomalias', async (event, meses) => {

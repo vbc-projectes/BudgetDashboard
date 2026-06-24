@@ -1141,21 +1141,21 @@ function _renderCRChart(data) {
 
     const today = new Date().toISOString().slice(0, 10);
     const series = data.saldoSeries.filter(p => p.fecha <= today);
-    // Reducir puntos: mostrar máx 400 puntos (toma cada N días)
-    const step = Math.max(1, Math.floor(series.length / 400));
+    const step   = Math.max(1, Math.floor(series.length / 400));
     const reduced = series.filter((_, i) => i % step === 0 || i === series.length - 1);
 
-    const labels   = reduced.map(p => p.fecha);
-    const saldos   = reduced.map(p => p.saldo);
+    const labels = reduced.map(p => p.fecha);
+    const saldos = reduced.map(p => p.saldo);
 
-    // Marcar las fechas con operaciones de bolsa
+    // ── Mapa de operaciones de bolsa ──
     const opDates = {};
     for (const op of (_inv.operaciones || [])) {
-        if (!opDates[op.fecha]) opDates[op.fecha] = [];
-        opDates[op.fecha].push(op.tipo);
+        const f = (op.fecha || '').slice(0, 10);
+        if (!opDates[f]) opDates[f] = [];
+        opDates[f].push(op.tipo);
     }
 
-    // Marcar las fechas con dividendos
+    // ── Mapa de dividendos ──
     const retencionDivPct = parseFloat(localStorage.getItem('retencionDividendos') || '0');
     const divDates = {};
     for (const div of (_inv.dividendos || [])) {
@@ -1166,6 +1166,39 @@ function _renderCRChart(data) {
             : bruto * retencionDivPct / 100;
         const neto = bruto - ret;
         if (neto > 0) divDates[f] = (divDates[f] || 0) + neto;
+    }
+
+    // ── Mapa de ajustes manuales de saldo ──
+    const ajusteDates = {};
+    for (const aj of (data.ajustes || [])) {
+        ajusteDates[aj.fecha] = aj.saldo;
+    }
+
+    // ── Mapa de cambios de tipo de interés ──
+    const tiposDates = {};
+    for (const ti of (data.tiposInteres || [])) {
+        // desde es YYYY-MM; marcamos el primer día del mes
+        const f = ti.desde + '-01';
+        tiposDates[f] = ti.interes;
+    }
+
+    // Función de color por fecha (prioridad: ajuste > compra > venta > tipo_interés > dividendo)
+    function pointColor(f) {
+        if (ajusteDates[f] !== undefined) return '#8b5cf6';
+        if (opDates[f]) {
+            const tipos = opDates[f];
+            if (tipos.includes('compra') && tipos.includes('venta')) return '#f59e0b';
+            return tipos.includes('compra') ? '#ef4444' : '#22c55e';
+        }
+        if (tiposDates[f] !== undefined) return '#06b6d4';
+        if (divDates[f]) return '#f59e0b';
+        return 'transparent';
+    }
+
+    function pointSize(f) {
+        if (ajusteDates[f] !== undefined) return 7;
+        if (opDates[f] || tiposDates[f] !== undefined || divDates[f]) return 5;
+        return 0;
     }
 
     _inv.chartCR = new Chart(canvas, {
@@ -1180,18 +1213,10 @@ function _renderCRChart(data) {
                 borderWidth: 2,
                 fill: true,
                 tension: 0.2,
-                pointRadius: labels.map(f => (opDates[f] || divDates[f]) ? 5 : 0),
-                pointBackgroundColor: labels.map(f => {
-                    if (opDates[f]) return opDates[f].includes('compra') ? '#ef4444' : '#22c55e';
-                    if (divDates[f]) return '#f59e0b';
-                    return 'transparent';
-                }),
-                pointBorderColor: labels.map(f => {
-                    if (opDates[f]) return opDates[f].includes('compra') ? '#ef4444' : '#22c55e';
-                    if (divDates[f]) return '#f59e0b';
-                    return 'transparent';
-                }),
-                pointHoverRadius: 7,
+                pointRadius:          labels.map(pointSize),
+                pointBackgroundColor: labels.map(pointColor),
+                pointBorderColor:     labels.map(pointColor),
+                pointHoverRadius: 8,
                 spanGaps: true
             }]
         },
@@ -1204,12 +1229,16 @@ function _renderCRChart(data) {
                     mode: 'index', intersect: false,
                     callbacks: {
                         label: ctx => {
-                            const f = labels[ctx.dataIndex];
+                            const f   = labels[ctx.dataIndex];
                             const ops = opDates[f];
                             const div = divDates[f];
+                            const aj  = ajusteDates[f];
+                            const ti  = tiposDates[f];
                             let extra = '';
-                            if (ops) extra += ' — ' + ops.map(t => t === 'compra' ? '▼ compra' : '▲ venta').join(', ');
-                            if (div) extra += ` — ★ dividendo: +${_fmt(div)}`;
+                            if (ops) extra += ' — ' + ops.map(t => t === 'compra' ? '▼ Compra' : '▲ Venta').join(', ');
+                            if (div !== undefined) extra += ` — ★ Dividendo neto: +${_fmt(div)}`;
+                            if (aj  !== undefined) extra += ` — ✎ Ajuste saldo → ${_fmt(aj)}`;
+                            if (ti  !== undefined) extra += ` — % Nuevo tipo: ${ti}%`;
                             return ` Saldo: ${_fmt(ctx.parsed.y)}${extra}`;
                         }
                     }
@@ -1222,8 +1251,25 @@ function _renderCRChart(data) {
             interaction: { mode: 'nearest', axis: 'x', intersect: false }
         }
     });
-    // Force resize after a short delay to handle cases where canvas dimensions
-    // weren't fully computed at chart-creation time
+
+    // Leyenda de marcadores
+    const legendEl = document.getElementById('invChartCRLegend');
+    if (legendEl) {
+        const items = [
+            { color: '#ef4444', label: '▼ Compra' },
+            { color: '#22c55e', label: '▲ Venta' },
+            { color: '#f59e0b', label: '★ Dividendo' },
+            { color: '#8b5cf6', label: '✎ Ajuste saldo' },
+            { color: '#06b6d4', label: '% Cambio tipo' }
+        ];
+        legendEl.innerHTML = items.map(it =>
+            `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:12px;">
+              <span style="width:10px;height:10px;border-radius:50%;background:${it.color};display:inline-block;"></span>
+              <span style="font-size:11px;color:#666;">${it.label}</span>
+            </span>`
+        ).join('');
+    }
+
     setTimeout(() => { if (_inv.chartCR) try { _inv.chartCR.resize(); } catch (_) {} }, 50);
 }
 

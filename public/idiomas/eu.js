@@ -153,7 +153,12 @@ TRADUCCIONES.eu = {
                 titulo: 'Ezarpenak',
                 descripcion: 'Konfiguratu gaia, hizkuntza eta lan-moneta',
                 usuarioActivo: 'Erabiltzaile aktiboa',
-                cambiarUsuarioSidebar: 'Erabiltzailea alda dezakezu sidebar-eko botoitik.'
+                cambiarUsuarioSidebar: 'Erabiltzailea alda dezakezu profil-hautatzailean.',
+                retencionDividendos: 'Dibidendu-atxikipena (%):',
+                retencionDividendosNota: 'Automatikoki aplikatzen da beren atxikipenik ez duten dibidendoei.',
+                copiaSeguridad: 'Segurtasun-kopia',
+                copiaDescripcion: 'Deskargatu zure SQLite datu-basearen kopia.',
+                descargarBackup: 'Segurtasun-kopia deskargatu'
             },
 
         usuarios: {
@@ -166,7 +171,39 @@ TRADUCCIONES.eu = {
             placeholderNombre: 'Izena',
             crear: 'Sortu',
             refrescar: 'Freskatu',
-            sinUsuario: 'Erabiltzailerik ez'
+            sinUsuario: 'Erabiltzailerik ez',
+            quienEres: 'Nor zara?',
+            gestionarPerfiles: 'Profilak kudeatu',
+            introducePIN: 'Sartu zure PINa',
+            pinIncorrecto: 'PIN okerra. Saiatu berriro.',
+            volver: '← Itzuli',
+            eligeAvatar: 'Aukeratu avatar bat',
+            avatarActualizado: 'Avatarra eguneratuta',
+            usuarioCreado: '"{name}" erabiltzailea sortuta',
+            cargandoUsuarios: 'Kargatzen...',
+            errorCargandoUsuarios: 'Errorea erabiltzaileak kargatzean',
+            sinUsuarios: 'Ez dago erabiltzailerik. Sortu bat "Profilak kudeatu" atalean.',
+            anadirPIN: '+ PIN',
+            quitarPIN: '🔒 PIN kendu',
+            pinEstablecido: 'PINa ezarrita',
+            pinEliminado: 'PINa ezabatuta'
+        },
+
+        presupuestos: {
+            titulo: 'Aldiaren aurrekontua',
+            gestionarLimites: 'Mugak kudeatu',
+            categoria: 'Kategoria',
+            limite: 'Muga',
+            limitePeriodo: 'Aldiaren muga',
+            gastado: 'Gastatu',
+            restante: 'Geratzen',
+            progreso: 'Aurrerabidea',
+            estado: 'Egoera',
+            superado: '⚠️ Gaindituta',
+            ok: '✓ OK',
+            sinPresupuestos: 'Ez dago aurrekonturik. Egin klik "Mugak kudeatu" gehitzeko.',
+            errorCargando: 'Errorea aurrekontuak kargatzean.',
+            sinRango: 'Ez dago data-tarterik.'
         },
 
         // ===== IMPORTACIÓN BANCARIA =====

@@ -219,7 +219,7 @@ window.API = {
                 case '/sub_huchas/total':
                     return api.getSubHuchasTotal(params.get('mes'));
                 case '/dashboard/presupuestos':
-                    return api.getDashboardPresupuestos(params.get('mes'));
+                    return api.getDashboardPresupuestos({ mes: params.get('mes'), desde: params.get('desde'), hasta: params.get('hasta') });
                 case '/dashboard/anomalias':
                     return api.getDashboardAnomalias(params.get('meses') ? parseInt(params.get('meses')) : 6);
             }

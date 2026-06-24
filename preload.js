@@ -26,6 +26,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setCurrentUser: (data) => ipcRenderer.invoke('set-current-user', data),
     getUserProfile: (data) => ipcRenderer.invoke('get-user-profile', data),
     setUserIcon: (data) => ipcRenderer.invoke('set-user-icon', data),
+    hasUserPin: (data) => ipcRenderer.invoke('has-user-pin', data),
+    verifyUserPin: (data) => ipcRenderer.invoke('verify-user-pin', data),
+    setUserPin: (data) => ipcRenderer.invoke('set-user-pin', data),
+    removeUserPin: (data) => ipcRenderer.invoke('remove-user-pin', data),
 
     // ============= CATEGORIAS =============
     addCategoria: (data) => ipcRenderer.invoke('add-categoria', data),

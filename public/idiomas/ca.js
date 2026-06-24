@@ -154,7 +154,12 @@ TRADUCCIONES.ca = {
                 titulo: 'Ajustos',
                 descripcion: 'Configura tema, idioma i moneda de treball',
                 usuarioActivo: 'Usuari actiu',
-                cambiarUsuarioSidebar: 'Pots canviar d\'usuari des del botó del sidebar.'
+                cambiarUsuarioSidebar: 'Pots canviar d\'usuari des del selector de perfils.',
+                retencionDividendos: 'Retenció dividends (%):',
+                retencionDividendosNota: 'S\'aplica automàticament a tots els dividends que no tinguin retenció pròpia.',
+                copiaSeguridad: 'Còpia de seguretat',
+                copiaDescripcion: 'Descarrega una còpia de la teva base de dades SQLite.',
+                descargarBackup: 'Descarregar backup'
         },
 
         usuarios: {
@@ -167,7 +172,39 @@ TRADUCCIONES.ca = {
             placeholderNombre: 'Nom',
             crear: 'Crear',
             refrescar: 'Refrescar',
-            sinUsuario: 'Sense usuari'
+            sinUsuario: 'Sense usuari',
+            quienEres: 'Qui ets?',
+            gestionarPerfiles: 'Gestionar perfils',
+            introducePIN: 'Introdueix el teu PIN',
+            pinIncorrecto: 'PIN incorrecte. Torna-ho a intentar.',
+            volver: '← Tornar',
+            eligeAvatar: 'Tria un avatar',
+            avatarActualizado: 'Avatar actualitzat',
+            usuarioCreado: 'Usuari "{name}" creat',
+            cargandoUsuarios: 'Carregant...',
+            errorCargandoUsuarios: 'Error en carregar usuaris',
+            sinUsuarios: 'No hi ha usuaris. Crea\'n un des de "Gestionar perfils".',
+            anadirPIN: '+ PIN',
+            quitarPIN: '🔒 Treure PIN',
+            pinEstablecido: 'PIN establert',
+            pinEliminado: 'PIN eliminat'
+        },
+
+        presupuestos: {
+            titulo: 'Pressupost del període',
+            gestionarLimites: 'Gestionar límits',
+            categoria: 'Categoria',
+            limite: 'Límit',
+            limitePeriodo: 'Límit període',
+            gastado: 'Gastat',
+            restante: 'Restant',
+            progreso: 'Progrés',
+            estado: 'Estat',
+            superado: '⚠️ Superat',
+            ok: '✓ OK',
+            sinPresupuestos: 'Sense pressupostos configurats. Fes clic a "Gestionar límits" per afegir-ne.',
+            errorCargando: 'Error en carregar pressupostos.',
+            sinRango: 'Sense rang de dates.'
         },
 
         // ===== IMPORTACIÓ BANCÀRIA =====

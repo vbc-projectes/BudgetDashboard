@@ -363,6 +363,11 @@ function cargarIngresosForm() {
         document.getElementById('crAjusteDesc').value    = '';
         document.getElementById('crTipoDesde').value     = '';
         document.getElementById('crTipoInteres').value   = '';
+        // Mover a body para escapar del transform del contenedor de pestañas
+        // (position:fixed queda relativo al ancestro con transform, no al viewport)
+        if (modalCRConfig.parentElement !== document.body) {
+            document.body.appendChild(modalCRConfig);
+        }
         modalCRConfig.style.display = 'flex';
     }
 

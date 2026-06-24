@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const config = require('./config');
 
 const USERS_ROOT = path.isAbsolute(config.USERS_ROOT)
@@ -101,6 +102,33 @@ function setUserIcon(name, icon) {
     return saveUserProfile(name, profile);
 }
 
+function _hashPin(pin) {
+    return crypto.createHash('sha256').update(String(pin)).digest('hex');
+}
+
+function hasUserPin(name) {
+    return !!readUserProfile(name).pinHash;
+}
+
+function setUserPin(name, pin) {
+    if (!/^\d{4}$/.test(String(pin))) throw new Error('El PIN debe ser de 4 dígitos numéricos');
+    const profile = readUserProfile(name);
+    profile.pinHash = _hashPin(pin);
+    return saveUserProfile(name, profile);
+}
+
+function removeUserPin(name) {
+    const profile = readUserProfile(name);
+    delete profile.pinHash;
+    return saveUserProfile(name, profile);
+}
+
+function verifyUserPin(name, pin) {
+    const profile = readUserProfile(name);
+    if (!profile.pinHash) return true;
+    return profile.pinHash === _hashPin(pin);
+}
+
 module.exports = {
     USERS_ROOT,
     normalizeUserName,
@@ -111,5 +139,9 @@ module.exports = {
     saveLastUser,
     readUserProfile,
     saveUserProfile,
-    setUserIcon
+    setUserIcon,
+    hasUserPin,
+    setUserPin,
+    removeUserPin,
+    verifyUserPin
 };

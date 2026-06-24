@@ -63,32 +63,63 @@
     </div>
 </div>
 
-<!-- Selector de usuarios -->
+<!-- Selector de usuarios (Netflix style) -->
 <div id="userOverlay" class="user-overlay hidden">
-    <div class="user-card">
-        <h2 data-i18n="usuarios.seleccionaUsuario">Selecciona usuario</h2>
-        <div class="user-row">
-            <label for="userSelect" data-i18n="usuarios.usuarios">Usuarios</label>
-            <select id="userSelect"></select>
-            <button id="userSelectBtn" class="btn-primary" type="button" data-i18n="usuarios.entrar">Entrar</button>
-        </div>
-        <div class="user-row">
-            <label for="userIconSelect" data-i18n="usuarios.icono">Icono</label>
-            <select id="userIconSelect"></select>
-            <span id="userIconPreview" class="user-icon-preview">
-                <i class="fas fa-user"></i>
-            </span>
-        </div>
-        <div class="user-divider" data-i18n="usuarios.o">o</div>
-        <div class="user-row">
-            <label for="newUserName" data-i18n="usuarios.nuevoUsuario">Nuevo usuario</label>
-            <input id="newUserName" type="text" data-i18n-placeholder="usuarios.placeholderNombre" placeholder="Nombre" />
-            <button id="userCreateBtn" class="btn-success" type="button" data-i18n="usuarios.crear">Crear</button>
-        </div>
-        <div class="user-actions">
-            <button id="userRefreshBtn" class="btn-secondary" type="button" data-i18n="usuarios.refrescar">Refrescar</button>
+
+    <!-- Pantalla 1: Picker de perfiles -->
+    <div id="nfPickerScreen" class="nf-screen">
+        <h1 class="nf-title" data-i18n="usuarios.quienEres">¿Quién eres?</h1>
+        <div id="nfProfilesGrid" class="nf-profiles-grid"></div>
+        <div class="nf-footer">
+            <button id="nfManageBtn" class="nf-manage-btn" type="button">
+                <i class="fas fa-edit"></i> <span data-i18n="usuarios.gestionarPerfiles">Gestionar perfiles</span>
+            </button>
         </div>
     </div>
+
+    <!-- Pantalla 2: Introducir PIN -->
+    <div id="nfPinScreen" class="nf-screen hidden">
+        <div class="nf-pin-avatar" id="nfPinAvatar"><i class="fas fa-user"></i></div>
+        <p class="nf-pin-name" id="nfPinName"></p>
+        <p class="nf-pin-label" data-i18n="usuarios.introducePIN">Introduce tu PIN</p>
+        <div class="nf-pin-dots" id="nfPinDots">
+            <span class="nf-pin-dot"></span>
+            <span class="nf-pin-dot"></span>
+            <span class="nf-pin-dot"></span>
+            <span class="nf-pin-dot"></span>
+        </div>
+        <p class="nf-pin-error hidden" id="nfPinError" data-i18n="usuarios.pinIncorrecto">PIN incorrecto. Inténtalo de nuevo.</p>
+        <div class="nf-numpad">
+            <button class="nf-numkey" data-num="1" type="button">1</button>
+            <button class="nf-numkey" data-num="2" type="button">2</button>
+            <button class="nf-numkey" data-num="3" type="button">3</button>
+            <button class="nf-numkey" data-num="4" type="button">4</button>
+            <button class="nf-numkey" data-num="5" type="button">5</button>
+            <button class="nf-numkey" data-num="6" type="button">6</button>
+            <button class="nf-numkey" data-num="7" type="button">7</button>
+            <button class="nf-numkey" data-num="8" type="button">8</button>
+            <button class="nf-numkey" data-num="9" type="button">9</button>
+            <button class="nf-numkey nf-numkey-empty" type="button" tabindex="-1"></button>
+            <button class="nf-numkey" data-num="0" type="button">0</button>
+            <button class="nf-numkey nf-numkey-del" id="nfPinDel" type="button">⌫</button>
+        </div>
+        <button class="nf-back-btn" id="nfPinBackBtn" type="button" data-i18n="usuarios.volver">← Volver</button>
+    </div>
+
+    <!-- Pantalla 3: Gestionar perfiles -->
+    <div id="nfManageScreen" class="nf-screen hidden">
+        <h2 class="nf-title" style="font-size:1.6rem;" data-i18n="usuarios.gestionarPerfiles">Gestionar perfiles</h2>
+        <div id="nfManageList" class="nf-manage-list"></div>
+        <div class="nf-manage-new">
+            <h3 data-i18n="usuarios.nuevoUsuario">Nuevo usuario</h3>
+            <div class="nf-manage-row">
+                <input id="newUserName" type="text" data-i18n-placeholder="usuarios.placeholderNombre" placeholder="Nombre" class="nf-input" />
+                <button id="userCreateBtn" class="btn-primary" type="button" data-i18n="usuarios.crear">Crear</button>
+            </div>
+        </div>
+        <button class="nf-back-btn" id="nfManageBackBtn" type="button" data-i18n="usuarios.volver">← Volver</button>
+    </div>
+
 </div>
 
 <!-- Panel explicativo de métricas -->

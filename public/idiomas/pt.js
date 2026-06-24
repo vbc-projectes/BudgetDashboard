@@ -153,7 +153,12 @@ TRADUCCIONES.pt =  {
                 titulo: 'Configurações',
                 descripcion: 'Configure o tema, idioma e moeda de trabalho',
                 usuarioActivo: 'Usuário ativo',
-                cambiarUsuarioSidebar: 'Você pode trocar de usuário pelo botão da barra lateral.'
+                cambiarUsuarioSidebar: 'Você pode trocar de usuário pelo seletor de perfis.',
+                retencionDividendos: 'Retenção de dividendos (%):',
+                retencionDividendosNota: 'Aplicado automaticamente a todos os dividendos sem retenção própria.',
+                copiaSeguridad: 'Cópia de segurança',
+                copiaDescripcion: 'Baixe uma cópia do seu banco de dados SQLite.',
+                descargarBackup: 'Baixar backup'
             },
 
         usuarios: {
@@ -166,7 +171,39 @@ TRADUCCIONES.pt =  {
             placeholderNombre: 'Nome',
             crear: 'Criar',
             refrescar: 'Atualizar',
-            sinUsuario: 'Sem usuário'
+            sinUsuario: 'Sem usuário',
+            quienEres: 'Quem é você?',
+            gestionarPerfiles: 'Gerenciar perfis',
+            introducePIN: 'Digite seu PIN',
+            pinIncorrecto: 'PIN incorreto. Tente novamente.',
+            volver: '← Voltar',
+            eligeAvatar: 'Escolha um avatar',
+            avatarActualizado: 'Avatar atualizado',
+            usuarioCreado: 'Usuário "{name}" criado',
+            cargandoUsuarios: 'Carregando...',
+            errorCargandoUsuarios: 'Erro ao carregar usuários',
+            sinUsuarios: 'Nenhum usuário. Crie um em "Gerenciar perfis".',
+            anadirPIN: '+ PIN',
+            quitarPIN: '🔒 Remover PIN',
+            pinEstablecido: 'PIN definido',
+            pinEliminado: 'PIN removido'
+        },
+
+        presupuestos: {
+            titulo: 'Orçamento do período',
+            gestionarLimites: 'Gerenciar limites',
+            categoria: 'Categoria',
+            limite: 'Limite',
+            limitePeriodo: 'Limite período',
+            gastado: 'Gasto',
+            restante: 'Restante',
+            progreso: 'Progresso',
+            estado: 'Estado',
+            superado: '⚠️ Excedido',
+            ok: '✓ OK',
+            sinPresupuestos: 'Sem orçamentos configurados. Clique em "Gerenciar limites" para adicionar.',
+            errorCargando: 'Erro ao carregar orçamentos.',
+            sinRango: 'Sem intervalo de datas.'
         },
 
         // ===== IMPORTACIÓN BANCARIA =====
