@@ -101,26 +101,30 @@ async function cargarResumenPeriodos() {
                 // Obtener total hucha
                 if (hucha) {
                     try {
-                        const [resHucha, resCR, resBolsaPos, resSubHuchas, resSubHuchasPunt] = await Promise.all([
+                        const retencionPct = parseFloat(localStorage.getItem('retencionDividendos') || '0');
+                        // Solo proyectar CR a fecha futura en períodos futuros.
+                        // Para período actual/pasados usar hoy (coherente con pestaña Hucha).
+                        const isFuturePeriodo = ['proximo1mes', 'proximos3meses', 'proximos6meses'].includes(periodo);
+                        const { hasta: hastaRef } = getInicioDateRange(periodo);
+                        const crFechaParam = (isFuturePeriodo && hastaRef) ? `&fecha=${hastaRef}` : '';
+                        const [resHucha, resCRSaldo, resBolsaPos, resSubHuchas, resSubHuchasPunt] = await Promise.all([
                             fetch('/hucha', { signal }),
-                            fetch('/cuenta_remunerada', { signal }),
+                            fetch(`/cuenta-remunerada/saldo-hoy?retencionDivPct=${retencionPct}${crFechaParam}`, { signal }),
                             fetch('/bolsa/posiciones', { signal }),
                             fetch('/sub_huchas', { signal }),
                             fetch(`/sub_huchas/total?mes=${getReferenceMonthForPeriod(periodo)}`, { signal })
                         ]);
 
                         const dataHucha = resHucha.ok ? await resHucha.json() : [];
-                        const dataCR = resCR.ok ? await resCR.json() : [];
+                        const crSaldoData = resCRSaldo.ok ? await resCRSaldo.json() : null;
                         const bolsaPosiciones = resBolsaPos.ok ? await resBolsaPos.json() : [];
                         const subHuchasList = resSubHuchas.ok ? await resSubHuchas.json() : [];
                         const subHuchasTotalData = resSubHuchasPunt.ok ? await resSubHuchasPunt.json() : { total: 0 };
 
                         const totalHuchaManual = dataHucha.reduce((acc, item) => acc + (parseFloat(item.cantidad) || 0), 0);
 
-                        const mesReferencia = getReferenceMonthForPeriod(periodo);
-                        const totalCR = dataCR
-                            .filter(cr => isCuentaRemuneradaActiva(cr, mesReferencia))
-                            .reduce((acc, cr) => acc + calcularSaldoCuentaRemunerada(cr, mesReferencia), 0);
+                        // Saldo real de CR mediante simulación diaria (igual que la pestaña Hucha)
+                        const totalCR = parseFloat(crSaldoData?.saldo) || 0;
 
                         // Valor actual de las posiciones abiertas (nuevo sistema bolsa)
                         let totalAssets = 0;

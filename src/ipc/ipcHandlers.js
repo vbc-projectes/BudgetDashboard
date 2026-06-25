@@ -633,8 +633,10 @@ function registerIpcHandlers() {
         return { success: true };
     });
 
-    safeHandle('cr-get-saldo-hoy', async () => {
-        return new CuentaRemuneradaService().getSaldoHoy();
+    safeHandle('cr-get-saldo-hoy', async (event, data) => {
+        const ret   = Math.max(0, Math.min(100, parseFloat(data?.retencionDivPct) || 0));
+        const fecha = /^\d{4}-\d{2}-\d{2}$/.test(data?.fecha || '') ? data.fecha : null;
+        return new CuentaRemuneradaService().getSaldoHoy(ret, fecha);
     });
 
     // ── CR aportaciones variables ────────────────────────────────────────────

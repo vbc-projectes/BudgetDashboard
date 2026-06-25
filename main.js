@@ -12,9 +12,18 @@ async function startApp() {
         registerIpcHandlers();
 
         // Crear ventana principal
+        // Icono de la ventana / barra de tareas
+        const iconPath = (() => {
+            const base = path.join(__dirname, 'assets');
+            if (process.platform === 'win32')  return path.join(base, 'icon.ico');
+            if (process.platform === 'darwin') return path.join(base, 'icon.icns');
+            return path.join(base, 'icon.png');
+        })();
+
         mainWindow = new BrowserWindow({
             width: 1200,
             height: 800,
+            icon: iconPath,
             titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
             titleBarOverlay: false,
             autoHideMenuBar: electronApp.isPackaged,

@@ -99,7 +99,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     updateCuentaRemunerada: (data) => ipcRenderer.invoke('update-cuenta-remunerada', data),
     deleteCuentaRemunerada: (data) => ipcRenderer.invoke('delete-cuenta-remunerada', data),
     setCuentaRemuneradaLink: (data) => ipcRenderer.invoke('cuenta-remunerada-set-link', data),
-    getCRSaldoHoy: () => ipcRenderer.invoke('cr-get-saldo-hoy'),
+    getCRSaldoHoy: (data) => ipcRenderer.invoke('cr-get-saldo-hoy', data),
     // CR aportaciones variables
     getCRAportaciones: (data) => ipcRenderer.invoke('cr-get-aportaciones', data),
     addCRAportacion:   (data) => ipcRenderer.invoke('cr-add-aportacion',   data),

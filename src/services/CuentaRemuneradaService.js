@@ -41,9 +41,12 @@ class CuentaRemuneradaService {
 
     /**
      * Motor de simulación interno.
-     * @param {boolean} fullSeries - Si true, genera saldoSeries completo hasta fechaFin (puede ser futuro).
+     * @param {boolean} fullSeries  - Si true, genera saldoSeries completo.
+     * @param {number}  retencionDivPct - % retención sobre dividendos.
+     * @param {string|null} hastaFecha  - YYYY-MM-DD. Si se especifica, sobreescribe "hoy" para
+     *                                    permitir proyecciones futuras o balances históricos.
      */
-    async _simulate(fullSeries, retencionDivPct = 0) {
+    async _simulate(fullSeries, retencionDivPct = 0, hastaFecha = null) {
         // Obtener CR vinculada (o la primera disponible si no hay ninguna vinculada)
         let cuenta = await dbGet(db,
             `SELECT * FROM cuenta_remunerada WHERE linked_to_bolsa = 1 ORDER BY created_at LIMIT 1`
@@ -66,7 +69,7 @@ class CuentaRemuneradaService {
             };
         }
 
-        const _now = new Date();
+        const _now = hastaFecha ? new Date(hastaFecha + 'T00:00:00') : new Date();
         const hoy  = CuentaRemuneradaService._toLocalDateStr(_now);
         const toLD = CuentaRemuneradaService._toLocalDateStr;
 
@@ -343,8 +346,8 @@ class CuentaRemuneradaService {
      * No devuelve saldoSeries — mucho más rápido que getSaldoDiario().
      * Devuelve { cuenta, saldo, saldoInvertido, interesAcumuladoBruto, interesAcumuladoNeto, tasaAnualEfectiva }
      */
-    async getSaldoHoy(retencionDivPct = 0) {
-        const r = await this._simulate(false, retencionDivPct);
+    async getSaldoHoy(retencionDivPct = 0, hastaFecha = null) {
+        const r = await this._simulate(false, retencionDivPct, hastaFecha);
         return {
             cuenta:                r.cuenta,
             saldo:                 r.saldoHoy,

@@ -45,46 +45,107 @@
         const chart = window._dashCharts && window._dashCharts.gastosMes;
         if (!chart) return;
         const idx = chart.data.datasets.findIndex(function (d) { return d.label === ROLLING_LABEL; });
+
         if (rollingActive) {
             if (idx >= 0) return;
-            const gastos = (window._dashData && window._dashData.gastosMes) || [];
-            chart.data.datasets.push({
-                label: ROLLING_LABEL,
-                data: computeRolling(gastos, 3),
-                type: 'line',
-                borderColor: 'var(--warning,#eab308)',
-                backgroundColor: 'transparent',
-                borderWidth: 2.2,
-                borderDash: [6, 4],
-                fill: false,
-                tension: 0.4,
-                pointRadius: 0,
-                order: 0
+
+            // ── Datos: usar "Total mes" ya filtrado en el gráfico ──────────────
+            const totalDs = chart.data.datasets.find(function (d) {
+                return d.label === 'Total mes' || d.isOverlayTotalMes;
             });
+            var gastos;
+            if (totalDs) {
+                gastos = totalDs.data.slice();
+            } else {
+                const n = chart.data.labels.length;
+                gastos = new Array(n).fill(0);
+                chart.data.datasets.forEach(function (ds) {
+                    if (ds.type === 'bar' || !ds.type) {
+                        ds.data.forEach(function (v, i) { gastos[i] += Number(v) || 0; });
+                    }
+                });
+            }
+
+            // ── Eje Y secundario oculto (no participa en el stack de barras) ──
+            // Copiar min/max del eje principal antes de añadir el dataset
+            // para que ambos ejes muestren la misma escala.
+            const yMain = chart.scales && chart.scales.y;
+            chart.options.scales.yMM = {
+                display: false,
+                position: 'left',
+                stacked: false,
+                grid: { display: false },
+                min: yMain ? yMain.min : undefined,
+                max: yMain ? yMain.max : undefined
+            };
+
+            chart.data.datasets.push({
+                label:           ROLLING_LABEL,
+                data:            computeRolling(gastos, 3),
+                yAxisID:         'yMM',      // eje independiente del stack
+                type:            'line',
+                borderColor:     'var(--warning,#eab308)',
+                backgroundColor: 'transparent',
+                borderWidth:     2.2,
+                borderDash:      [6, 4],
+                fill:            false,
+                tension:         0.4,
+                pointRadius:     0,
+                order:           0
+            });
+
+            chart.update();
+
+            // Sincronizar rango después del primer render
+            if (chart.scales.y && chart.options.scales.yMM) {
+                chart.options.scales.yMM.min = chart.scales.y.min;
+                chart.options.scales.yMM.max = chart.scales.y.max;
+                chart.update('none');
+            }
+
         } else {
             if (idx >= 0) chart.data.datasets.splice(idx, 1);
+            delete chart.options.scales.yMM;
+            chart.update();
         }
-        chart.update();
     }
 
-    // ===== Monthly comparison table (año × mes) con filtros =====
-    const MONTH_NAMES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    // ===== Comparativa interanual — gráficos (barras agrupadas + líneas) =====
+    const MONTH_NAMES  = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const YEAR_PALETTE = ['#6366f1','#22c55e','#f59e0b','#ef4444','#06b6d4','#8b5cf6','#f97316','#ec4899','#14b8a6','#a855f7'];
 
-    var _tableFullData      = null;
-    var _selectedYears      = new Set();
-    var _selectedMonths     = new Set([1,2,3,4,5,6,7,8,9,10,11,12]);
-    var _allAvailableYears  = [];
+    var _tableFullData     = null;
+    var _selectedYears     = new Set();
+    var _selectedMonths    = new Set([1,2,3,4,5,6,7,8,9,10,11,12]);
+    var _allAvailableYears = [];
+    var _selectedMetric    = 'ingresos'; // 'ingresos' | 'gastos' | 'ahorro'
+    var _chartCompBar      = null;
+    var _chartCompLine     = null;
 
     function injectMonthlyTable() {
         const grid = document.querySelector('.dashboard-grid');
-        if (!grid || document.getElementById('dashTablaComparativa')) return;
+        if (!grid || document.getElementById('dashCompSection')) return;
         const wrapper = document.createElement('div');
+        wrapper.id = 'dashCompSection';
         wrapper.className = 'chart-card full-width';
         wrapper.style.marginTop = '4px';
+        const subStyle = 'margin:0 0 8px;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-tertiary,#64748b);';
         wrapper.innerHTML =
-            '<h3><i class="fas fa-table icon-primary"></i> Comparativa mensual por año</h3>' +
-            '<div id="dashTablaFiltros" style="margin:8px 0 10px;"></div>' +
-            '<div id="dashTablaComparativa" style="overflow-x:auto;"></div>';
+            '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">' +
+                '<h3 style="margin:0;"><i class="fas fa-chart-bar icon-primary"></i> Comparativa interanual</h3>' +
+                '<div id="dashCompMetricSel" style="display:flex;gap:4px;margin-left:auto;flex-wrap:wrap;"></div>' +
+            '</div>' +
+            '<div id="dashTablaFiltros" style="margin:0 0 14px;"></div>' +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:20px;">' +
+                '<div style="min-width:0;">' +
+                    '<p style="' + subStyle + '">Barras agrupadas por año</p>' +
+                    '<div style="position:relative;height:300px;"><canvas id="dashCompBar"></canvas></div>' +
+                '</div>' +
+                '<div style="min-width:0;">' +
+                    '<p style="' + subStyle + '">Líneas por año</p>' +
+                    '<div style="position:relative;height:300px;"><canvas id="dashCompLine"></canvas></div>' +
+                '</div>' +
+            '</div>';
         grid.appendChild(wrapper);
     }
 
@@ -92,7 +153,6 @@
         if (!meses || !meses.length) return;
         _tableFullData = { meses: meses, ingresos: ingresos, gastos: gastos, ahorros: ahorros };
 
-        // Add newly seen years as selected by default
         meses.forEach(function (m) {
             const y = String(m).split('-')[0];
             if (!_allAvailableYears.includes(y)) {
@@ -102,8 +162,33 @@
         });
         _allAvailableYears.sort();
 
+        _renderMetricSelector();
         renderTableFilters();
         renderMonthlyTableFiltered();
+    }
+
+    function _renderMetricSelector() {
+        const el = document.getElementById('dashCompMetricSel');
+        if (!el) return;
+        function mBtn(key, label, col) {
+            var active = _selectedMetric === key;
+            return '<button data-metric="' + key + '" style="cursor:pointer;border-radius:999px;padding:3px 14px;' +
+                'font-size:0.78rem;font-weight:700;transition:all 0.12s;' +
+                'border:1.5px solid ' + col + ';' +
+                'background:' + (active ? col : 'transparent') + ';' +
+                'color:' + (active ? '#fff' : col) + ';">' + label + '</button>';
+        }
+        el.innerHTML =
+            mBtn('ingresos', 'Ingresos', 'var(--success,#22c55e)') +
+            mBtn('gastos',   'Gastos',   'var(--danger,#ef4444)') +
+            mBtn('ahorro',   'Ahorro',   'var(--info,#06b6d4)');
+        el.querySelectorAll('button[data-metric]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                _selectedMetric = btn.dataset.metric;
+                _renderMetricSelector();
+                renderMonthlyTableFiltered();
+            });
+        });
     }
 
     function renderTableFilters() {
@@ -118,21 +203,16 @@
                 'color:' + (active ? '#fff' : 'var(--text-secondary,#475569)') + ';' +
                 'transition:all 0.12s;';
         }
-
-        function allBtn(action) {
-            return 'cursor:pointer;border:1px solid var(--border-light,#e2e8f0);border-radius:999px;' +
-                'padding:2px 9px;font-size:0.72rem;font-weight:600;background:transparent;' +
-                'color:var(--text-tertiary,#64748b);transition:all 0.12s;' +
-                'data-bulk="' + action + '"';
-        }
+        const bulkStyle = 'cursor:pointer;border:1px solid var(--border-light,#e2e8f0);border-radius:999px;' +
+            'padding:2px 9px;font-size:0.72rem;font-weight:600;background:transparent;color:var(--text-tertiary,#64748b);';
 
         var html = '<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:5px;">';
         html += '<span style="font-size:0.73rem;font-weight:700;color:var(--text-tertiary,#64748b);min-width:42px;">Años:</span>';
         _allAvailableYears.forEach(function (y) {
             html += '<button style="' + pill(_selectedYears.has(y)) + '" data-filter="year" data-value="' + y + '">' + y + '</button>';
         });
-        html += '<button style="cursor:pointer;border:1px solid var(--border-light,#e2e8f0);border-radius:999px;padding:2px 9px;font-size:0.72rem;font-weight:600;background:transparent;color:var(--text-tertiary,#64748b);" data-bulk="year-all">Todos</button>';
-        html += '<button style="cursor:pointer;border:1px solid var(--border-light,#e2e8f0);border-radius:999px;padding:2px 9px;font-size:0.72rem;font-weight:600;background:transparent;color:var(--text-tertiary,#64748b);" data-bulk="year-none">Ninguno</button>';
+        html += '<button style="' + bulkStyle + '" data-bulk="year-all">Todos</button>';
+        html += '<button style="' + bulkStyle + '" data-bulk="year-none">Ninguno</button>';
         html += '</div>';
 
         html += '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">';
@@ -141,8 +221,8 @@
             const m = i + 1;
             html += '<button style="' + pill(_selectedMonths.has(m)) + '" data-filter="month" data-value="' + m + '">' + name + '</button>';
         });
-        html += '<button style="cursor:pointer;border:1px solid var(--border-light,#e2e8f0);border-radius:999px;padding:2px 9px;font-size:0.72rem;font-weight:600;background:transparent;color:var(--text-tertiary,#64748b);" data-bulk="month-all">Todos</button>';
-        html += '<button style="cursor:pointer;border:1px solid var(--border-light,#e2e8f0);border-radius:999px;padding:2px 9px;font-size:0.72rem;font-weight:600;background:transparent;color:var(--text-tertiary,#64748b);" data-bulk="month-none">Ninguno</button>';
+        html += '<button style="' + bulkStyle + '" data-bulk="month-all">Todos</button>';
+        html += '<button style="' + bulkStyle + '" data-bulk="month-none">Ninguno</button>';
         html += '</div>';
 
         container.innerHTML = html;
@@ -161,15 +241,10 @@
         container.querySelectorAll('button[data-bulk]').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 const action = this.dataset.bulk;
-                if (action === 'year-all') {
-                    _allAvailableYears.forEach(function (y) { _selectedYears.add(y); });
-                } else if (action === 'year-none') {
-                    _selectedYears.clear();
-                } else if (action === 'month-all') {
-                    [1,2,3,4,5,6,7,8,9,10,11,12].forEach(function (m) { _selectedMonths.add(m); });
-                } else if (action === 'month-none') {
-                    _selectedMonths.clear();
-                }
+                if (action === 'year-all')   _allAvailableYears.forEach(function (y) { _selectedYears.add(y); });
+                else if (action === 'year-none')  _selectedYears.clear();
+                else if (action === 'month-all')  [1,2,3,4,5,6,7,8,9,10,11,12].forEach(function (m) { _selectedMonths.add(m); });
+                else if (action === 'month-none') _selectedMonths.clear();
                 renderTableFilters();
                 renderMonthlyTableFiltered();
             });
@@ -177,18 +252,16 @@
     }
 
     function renderMonthlyTableFiltered() {
-        const container = document.getElementById('dashTablaComparativa');
-        if (!container || !_tableFullData) return;
+        if (!_tableFullData) return;
 
         const meses    = _tableFullData.meses;
         const ingresos = _tableFullData.ingresos;
         const gastos   = _tableFullData.gastos;
         const ahorros  = _tableFullData.ahorros;
 
-        // Build filtered map
-        const dataMap  = {};
+        // ── Construir mapa filtrado ─────────────────────────────────────────
+        const dataMap   = {};
         const monthsSet = new Set();
-
         meses.forEach(function (m, i) {
             const parts    = String(m).split('-');
             const year     = parts[0];
@@ -201,77 +274,96 @@
 
         const years  = Array.from(_selectedYears).filter(function (y) { return dataMap[y]; }).sort();
         const months = [1,2,3,4,5,6,7,8,9,10,11,12].filter(function (n) { return monthsSet.has(n); });
+        const labels = months.map(function (n) { return MONTH_NAMES[n - 1]; });
 
-        if (!years.length || !months.length) {
-            container.innerHTML = '<p style="text-align:center;padding:20px;color:var(--text-tertiary,#64748b);">Selecciona al menos un año y un mes</p>';
-            return;
+        function getVal(c) {
+            if (!c) return null;
+            return _selectedMetric === 'gastos' ? c.gas
+                 : _selectedMetric === 'ahorro' ? c.aho
+                 : c.ing;
         }
 
-        const BY = 'border-left:2px solid var(--border-medium,#ddd);';
-
-        var html = '<table style="width:100%;border-collapse:collapse;font-size:0.82rem;"><thead>';
-
-        // Row 1: year labels
-        html += '<tr style="border-bottom:1px solid var(--border-light,#e2e8f0);">';
-        html += '<th style="text-align:left;padding:6px 10px;min-width:44px;"></th>';
-        years.forEach(function (y) {
-            html += '<th colspan="3" style="text-align:center;padding:5px 8px;font-weight:700;' + BY + '">' + y + '</th>';
+        // ── Datasets: un color por año ─────────────────────────────────────
+        var datasets = years.map(function (y, yi) {
+            const color = YEAR_PALETTE[yi % YEAR_PALETTE.length];
+            const data  = months.map(function (m) { return getVal(dataMap[y] && dataMap[y][m]); });
+            return { label: y, data: data, backgroundColor: color, borderColor: color };
         });
-        html += '</tr>';
 
-        // Row 2: Ing / Gas / Aho sub-headers
-        html += '<tr style="border-bottom:2px solid var(--border-light,#e2e8f0);font-size:0.75rem;">';
-        html += '<th style="padding:3px 10px;text-align:left;color:var(--text-tertiary,#64748b);">Mes</th>';
-        years.forEach(function () {
-            html += '<th style="text-align:right;padding:3px 6px;' + BY + 'color:var(--success,#22c55e);">Ing.</th>';
-            html += '<th style="text-align:right;padding:3px 6px;color:var(--danger,#ef4444);">Gas.</th>';
-            html += '<th style="text-align:right;padding:3px 6px;color:var(--info,#06b6d4);">Aho.</th>';
-        });
-        html += '</tr></thead><tbody>';
+        // ── Opciones comunes ───────────────────────────────────────────────
+        var ticksFmt = function (v) { return fmt(v, 0); };
+        var tooltipFmt = function (ctx) { return ' ' + ctx.dataset.label + ': ' + fmt(ctx.parsed.y); };
+        var commonScales = {
+            x: {
+                grid: { color: 'rgba(0,0,0,0.04)' },
+                ticks: { color: '#555', autoSkip: false, maxRotation: 0 }
+            },
+            y: {
+                grid: { color: 'rgba(0,0,0,0.06)' },
+                ticks: { color: '#555', callback: ticksFmt }
+            }
+        };
+        var commonPlugins = {
+            datalabels: { display: false },
+            tooltip: { callbacks: { label: tooltipFmt } }
+        };
 
-        // Data rows
-        months.forEach(function (monthNum, idx) {
-            const bg = idx % 2 === 1 ? 'background:var(--gray-50,#f9fafb);' : '';
-            html += '<tr style="' + bg + '">';
-            html += '<td style="font-weight:600;padding:5px 10px;white-space:nowrap;color:var(--text-secondary,#475569);">' + MONTH_NAMES[monthNum - 1] + '</td>';
-            years.forEach(function (y) {
-                const c = dataMap[y] && dataMap[y][monthNum];
-                if (c) {
-                    const ac = c.aho >= 0 ? 'var(--info,#06b6d4)' : 'var(--danger,#ef4444)';
-                    html += '<td style="text-align:right;padding:5px 6px;white-space:nowrap;' + BY + 'color:var(--success,#22c55e);">' + fmt(c.ing) + '</td>';
-                    html += '<td style="text-align:right;padding:5px 6px;white-space:nowrap;color:var(--danger,#ef4444);">' + fmt(c.gas) + '</td>';
-                    html += '<td style="text-align:right;padding:5px 6px;white-space:nowrap;color:' + ac + ';">' + fmt(c.aho) + '</td>';
-                } else {
-                    html += '<td style="' + BY + 'text-align:right;padding:5px 6px;color:var(--gray-300,#d1d5db);">—</td>';
-                    html += '<td style="text-align:right;padding:5px 6px;color:var(--gray-300,#d1d5db);">—</td>';
-                    html += '<td style="text-align:right;padding:5px 6px;color:var(--gray-300,#d1d5db);">—</td>';
+        // ── Gráfico de barras agrupadas ────────────────────────────────────
+        var barCanvas = document.getElementById('dashCompBar');
+        if (barCanvas) {
+            if (_chartCompBar) { try { _chartCompBar.destroy(); } catch (_) {} }
+            _chartCompBar = new Chart(barCanvas, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: datasets.map(function (d) {
+                        return Object.assign({}, d, {
+                            backgroundColor: d.backgroundColor + 'cc',
+                            borderWidth: 0,
+                            borderRadius: 3
+                        });
+                    })
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: Object.assign({}, commonPlugins, {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+                    }),
+                    scales: commonScales,
+                    interaction: { mode: 'index', intersect: false }
                 }
             });
-            html += '</tr>';
-        });
+        }
 
-        // Average row
-        html += '<tr style="border-top:2px solid var(--border-light,#e2e8f0);font-weight:700;font-size:0.78rem;">';
-        html += '<td style="padding:5px 10px;color:var(--text-tertiary,#64748b);">Media</td>';
-        years.forEach(function (y) {
-            const cells = months.map(function (m) { return dataMap[y] && dataMap[y][m]; }).filter(Boolean);
-            if (!cells.length) {
-                html += '<td style="' + BY + 'text-align:right;padding:5px 6px;color:var(--gray-300,#d1d5db);">—</td>';
-                html += '<td style="text-align:right;padding:5px 6px;color:var(--gray-300,#d1d5db);">—</td>';
-                html += '<td style="text-align:right;padding:5px 6px;color:var(--gray-300,#d1d5db);">—</td>';
-                return;
-            }
-            const aI = avg(cells.map(function (c) { return c.ing; }));
-            const aG = avg(cells.map(function (c) { return c.gas; }));
-            const aA = avg(cells.map(function (c) { return c.aho; }));
-            const ac = aA >= 0 ? 'var(--info,#06b6d4)' : 'var(--danger,#ef4444)';
-            html += '<td style="text-align:right;padding:5px 6px;' + BY + 'color:var(--success,#22c55e);">' + fmt(aI) + '</td>';
-            html += '<td style="text-align:right;padding:5px 6px;color:var(--danger,#ef4444);">' + fmt(aG) + '</td>';
-            html += '<td style="text-align:right;padding:5px 6px;color:' + ac + ';">' + fmt(aA) + '</td>';
-        });
-        html += '</tr></tbody></table>';
-
-        container.innerHTML = html;
+        // ── Gráfico de líneas ──────────────────────────────────────────────
+        var lineCanvas = document.getElementById('dashCompLine');
+        if (lineCanvas) {
+            if (_chartCompLine) { try { _chartCompLine.destroy(); } catch (_) {} }
+            _chartCompLine = new Chart(lineCanvas, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: datasets.map(function (d) {
+                        return Object.assign({}, d, {
+                            borderWidth: 2.5,
+                            backgroundColor: d.backgroundColor + '22',
+                            fill: false,
+                            tension: 0.35,
+                            pointRadius: 4,
+                            pointHoverRadius: 6
+                        });
+                    })
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: Object.assign({}, commonPlugins, {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+                    }),
+                    scales: commonScales,
+                    interaction: { mode: 'index', intersect: false }
+                }
+            });
+        }
     }
 
     // ===== Anomaly badge =====
@@ -489,6 +581,10 @@
     // ===== Event listeners =====
     // Inject + refresh on every dashboardUpdated (tab may not exist until first click)
     window.addEventListener('dashboardUpdated', function () {
+        // Destruir charts comparativos al re-inyectar para evitar memory leaks
+        if (_chartCompBar)  { try { _chartCompBar.destroy();  } catch (_) {} _chartCompBar  = null; }
+        if (_chartCompLine) { try { _chartCompLine.destroy(); } catch (_) {} _chartCompLine = null; }
+
         injectRollingToggle();
         injectMonthlyTable();
         injectAnomalyBadge();

@@ -183,7 +183,7 @@ window.API = {
             'GET:/bolsa/estadisticas-fiscales':    () => api.bolsaGetEstadisticasFiscales(),
             'POST:/bolsa/sync-dividendos':         () => api.bolsaSyncDividendos(),
             'GET:/bolsa/cuenta-remunerada/saldo-diario': () => api.bolsaGetCRSaldoDiario(),
-            'GET:/cuenta-remunerada/saldo-hoy':    () => api.getCRSaldoHoy(),
+            'GET:/cuenta-remunerada/saldo-hoy':    () => api.getCRSaldoHoy({ retencionDivPct: params.get('retencionDivPct'), fecha: params.get('fecha') }),
             // Dashboard extensiones
             'GET:/dashboard/net-worth':            () => api.getDashboardNetWorth(),
             'GET:/dashboard/anomalias':            () => api.getDashboardAnomalias(),
