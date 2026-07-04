@@ -181,14 +181,23 @@ function calcularMontoIpc(monto, ipcPorcentaje, fechaBase, fechaObjetivo) {
  * @param {Date} hastaDate - Fecha límite del período
  * @param {string} registroDesde - Inicio del registro mensual (YYYY-MM)
  * @param {string} registroHasta - Fin del registro mensual (YYYY-MM) o null
+ * @param {number} frecuenciaMeses - Frecuencia de pago en meses (1=mensual, 3=trimestral, 6=semestral, 12=anual)
  * @returns {boolean}
  */
-function esMensualActivo(mes, hastaDate, registroDesde, registroHasta) {
+function esMensualActivo(mes, hastaDate, registroDesde, registroHasta, frecuenciaMeses = 1) {
     const mes28 = new Date(mes + "-28");
     const inicio28 = new Date(registroDesde + "-28");
     const fin28 = registroHasta ? new Date(registroHasta + "-28") : new Date(9999, 11, 31);
-    
-    return mes28 >= inicio28 && mes28 <= fin28 && mes28 <= hastaDate;
+
+    if (mes28 < inicio28 || mes28 > fin28 || mes28 > hastaDate) return false;
+
+    const fm = frecuenciaMeses > 1 ? frecuenciaMeses : 1;
+    if (fm === 1) return true;
+
+    const [dy, dm] = registroDesde.split('-').map(Number);
+    const [ty, tm] = mes.split('-').map(Number);
+    const monthsElapsed = (ty - dy) * 12 + (tm - dm);
+    return monthsElapsed % fm === 0;
 }
 
 /**
@@ -268,7 +277,7 @@ function agregarPuntualesPorMes(transacciones, meses, campo = 'total') {
 function agregarMensualesPorMes(transacciones, meses, hastaDate, campo = 'total') {
     transacciones.forEach(t => {
         meses.forEach(m => {
-            if (esMensualActivo(m.mes, hastaDate, t.desde, t.hasta)) {
+            if (esMensualActivo(m.mes, hastaDate, t.desde, t.hasta, t.frecuencia_meses || 1)) {
                 m[campo] = (m[campo] || 0) + t.monto;
             }
         });

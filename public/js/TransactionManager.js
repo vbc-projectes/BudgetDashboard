@@ -184,7 +184,8 @@ class TransactionManager {
     }
 
     createCell(item, column) {
-        let content = item[column] !== undefined ? item[column] : '';
+        const rawValue = item[column] !== undefined ? item[column] : '';
+        let content = rawValue;
         
         // Formatear columnas especiales
         if (column === 'interes_neto') {
@@ -203,6 +204,10 @@ class TransactionManager {
         } else if (column === 'interes' || column === 'ipc_porcentaje' || column === 'retencion') {
             const num = parseFloat(content);
             content = Number.isNaN(num) ? '—' : `${num}%`;
+        } else if (column === 'frecuencia_meses') {
+            const fm = parseInt(content) || 1;
+            const labels = { 1: this.t('gastos.frecMensual', 'Mensual'), 3: this.t('gastos.frecTrimestral', 'Trimestral'), 6: this.t('gastos.frecSemestral', 'Semestral'), 12: this.t('gastos.frecAnual', 'Anual') };
+            content = labels[fm] || `${fm}m`;
         } else if (content === null || content === undefined) {
             content = (column === 'bruto' || column === 'aportacion_mensual' || column === 'interes_generado' || column === 'monto_ajustado' || column === 'ipc_porcentaje' || column === 'retencion') ? '—' : '';
         } else {
@@ -210,7 +215,7 @@ class TransactionManager {
             content = this.escapeHtml(content);
         }
 
-        return `<td class="editable" data-field="${column}">${content}</td>`;
+        return `<td class="editable" data-field="${column}" data-value="${this.escapeHtml(String(rawValue))}">${content}</td>`;
     }
 
     createActionButtons(item, type = '') {
@@ -286,9 +291,10 @@ class TransactionManager {
         // Guardar datos originales y convertir a inputs
         cells.forEach(cell => {
             const field = cell.dataset.field;
-            originalData[field] = cell.textContent.trim();
-            
-            const input = this.createEditInput(field, cell.textContent.trim(), categories);
+            const rawVal = cell.dataset.value !== undefined ? cell.dataset.value : cell.textContent.trim();
+            originalData[field] = rawVal;
+
+            const input = this.createEditInput(field, rawVal, categories);
             cell.innerHTML = '';
             cell.appendChild(input);
         });
@@ -316,9 +322,9 @@ class TransactionManager {
                 
                 // Saltar campos de solo lectura
                 if (field === 'interes_generado' || field === 'monto_ajustado' || field === 'interes_neto' || field === 'linked_to_bolsa') return;
-                
+
                 let value = input.value;
-                
+
                 if (field === 'monto' || field === 'bruto' || field === 'aportacion_mensual') {
                     value = this.parseAmount(value);
                 } else if (field === 'interes') {
@@ -329,6 +335,8 @@ class TransactionManager {
                 } else if (field === 'ipc_porcentaje') {
                     value = parseFloat(value);
                     if (Number.isNaN(value)) value = 0;
+                } else if (field === 'frecuencia_meses') {
+                    value = parseInt(value) || 1;
                 } else if (field === 'categoria') {
                     // Guardar el nombre de categoría para mostrar y el ID para enviar al servidor
                     newData['categoria_id'] = input.value;
@@ -424,6 +432,22 @@ class TransactionManager {
                 input.min = '0';
                 input.max = '100';
             }
+        } else if (field === 'frecuencia_meses') {
+            input = document.createElement('select');
+            input.style.width = '100%';
+            const fmOpts = [
+                { v: 1, label: this.t('gastos.frecMensual', 'Mensual') },
+                { v: 3, label: this.t('gastos.frecTrimestral', 'Trimestral') },
+                { v: 6, label: this.t('gastos.frecSemestral', 'Semestral') },
+                { v: 12, label: this.t('gastos.frecAnual', 'Anual') }
+            ];
+            fmOpts.forEach(o => {
+                const opt = document.createElement('option');
+                opt.value = o.v;
+                opt.textContent = o.label;
+                if (parseInt(value) === o.v) opt.selected = true;
+                input.appendChild(opt);
+            });
         } else {
             input = document.createElement('input');
             input.type = 'text';

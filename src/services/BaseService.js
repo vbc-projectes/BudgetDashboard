@@ -5,6 +5,7 @@
 
 const db = require('../config/database');
 const { dbRun, dbGet, dbAll } = require('../utils/dbHelpers');
+const logger = require('../utils/logger');
 
 class BaseService {
     constructor(tableName, dateField = null) {
@@ -13,6 +14,7 @@ class BaseService {
         this.hasIncome = tableName.includes('ingresos');
         this.hasBruto = this.hasIncome && this.tableName !== 'ingresos_reales';
         this.hasIpc = this.tableName === 'gastos_mensuales';
+        this.hasNotas = !tableName.includes('_reales') && tableName !== 'cuenta_remunerada';
     }
 
     /**
@@ -24,17 +26,19 @@ class BaseService {
         const dateSelect = this.dateField ? `e.${this.dateField},` : '';
         const hastaField = this.tableName.includes('mensuales') ? 'e.hasta,' : '';
         const bruteField = this.hasBruto ? 'e.bruto,' : '';
-        const ipcField = this.hasIpc ? 'e.ipc_porcentaje,' : '';
-        
+        const ipcField = this.hasIpc ? 'e.ipc_porcentaje, e.frecuencia_meses,' : '';
+        const notasField = this.hasNotas ? 'e.notas,' : '';
+
         return await dbAll(db, `
-            SELECT 
-                e.id, 
+            SELECT
+                e.id,
                 ${dateSelect}
                 ${hastaField}
-                e.descripcion, 
-                e.monto, 
+                e.descripcion,
+                e.monto,
                 ${bruteField}
                 ${ipcField}
+                ${notasField}
                 c.nombre AS categoria
             FROM ${this.tableName} e
             JOIN categorias c ON e.categoria_id = c.id
@@ -48,8 +52,8 @@ class BaseService {
      * @param {Object} data - Record data
      */
     async add(data) {
-        const { descripcion, monto, bruto, categoria_id, fecha, desde, hasta, archivo_origen, ipc_porcentaje } = data;
-        
+        const { descripcion, monto, bruto, categoria_id, fecha, desde, hasta, archivo_origen, ipc_porcentaje, frecuencia_meses } = data;
+
         // Build INSERT based on table structure
         const columns = ['descripcion', 'monto', 'categoria_id'];
         const values = [descripcion, monto, categoria_id];
@@ -79,10 +83,17 @@ class BaseService {
             values.push(bruto || null);
         }
 
-        if (this.hasIpc && ipc_porcentaje !== undefined) {
-            columns.push('ipc_porcentaje');
-            placeholders.push('?');
-            values.push(parseFloat(ipc_porcentaje) || 0);
+        if (this.hasIpc) {
+            if (ipc_porcentaje !== undefined) {
+                columns.push('ipc_porcentaje');
+                placeholders.push('?');
+                values.push(parseFloat(ipc_porcentaje) || 0);
+            }
+            if (frecuencia_meses !== undefined) {
+                columns.push('frecuencia_meses');
+                placeholders.push('?');
+                values.push(parseInt(frecuencia_meses) || 1);
+            }
         }
 
         if (archivo_origen !== undefined) {
@@ -92,6 +103,7 @@ class BaseService {
         }
 
         const sql = `INSERT INTO ${this.tableName} (${columns.join(', ')}) VALUES (${placeholders.join(', ')})`;
+        logger.debug(`add ${this.tableName}: ${descripcion}`);
         await dbRun(db, sql, values);
     }
 
@@ -100,8 +112,8 @@ class BaseService {
      * @param {Object} data - Update data including ID
      */
     async update(data) {
-        const { id, descripcion, monto, bruto, categoria, categoria_id, fecha, desde, hasta, ipc_porcentaje } = data;
-        
+        const { id, descripcion, monto, bruto, categoria, categoria_id, fecha, desde, hasta, ipc_porcentaje, frecuencia_meses, notas } = data;
+
         // Determine category ID - prefer categoria_id if provided, otherwise look up by name
         let catId = categoria_id;
         
@@ -146,19 +158,31 @@ class BaseService {
             updates.push('bruto = ?');
             values.push(bruto || null);
         }
-        if (this.hasIpc && ipc_porcentaje !== undefined) {
-            updates.push('ipc_porcentaje = ?');
-            values.push(parseFloat(ipc_porcentaje) || 0);
+        if (this.hasIpc) {
+            if (ipc_porcentaje !== undefined) {
+                updates.push('ipc_porcentaje = ?');
+                values.push(parseFloat(ipc_porcentaje) || 0);
+            }
+            if (frecuencia_meses !== undefined) {
+                updates.push('frecuencia_meses = ?');
+                values.push(parseInt(frecuencia_meses) || 1);
+            }
         }
 
         if (catId) {
             updates.push('categoria_id = ?');
             values.push(catId);
         }
-        
+
+        if (this.hasNotas && notas !== undefined) {
+            updates.push('notas = ?');
+            values.push(notas || null);
+        }
+
         values.push(id);
 
         const sql = `UPDATE ${this.tableName} SET ${updates.join(', ')} WHERE id = ?`;
+        logger.debug(`update ${this.tableName} id=${id}`);
         await dbRun(db, sql, values);
     }
 
@@ -167,6 +191,7 @@ class BaseService {
      * @param {number|string} id - Record ID
      */
     async delete(id) {
+        logger.debug(`delete ${this.tableName} id=${id}`);
         await dbRun(db, `DELETE FROM ${this.tableName} WHERE id = ?`, [id]);
     }
 

@@ -223,6 +223,7 @@ function registerIpcHandlers() {
     safeHandle('create-user', async (event, data) => {
         const name = normalizeUserName(data?.name);
         ensureUserFolders(name);
+        logger.info(`User created: ${name}`);
         return { success: true, name };
     });
 
@@ -236,6 +237,7 @@ function registerIpcHandlers() {
         await db.__setDbPath(paths.dbPath);
         await runMigrations();
         setActiveUser(name);
+        logger.info(`Active user: ${name}`);
         return { success: true, name, paths };
     });
 

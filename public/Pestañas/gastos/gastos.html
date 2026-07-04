@@ -87,6 +87,7 @@
         <tr>
           <th data-i18n="gastos.desde">Desde</th>
           <th data-i18n="gastos.hasta">Hasta</th>
+          <th data-i18n="gastos.frecuencia">Frecuencia</th>
           <th data-i18n="formularios.descripcion">Descripción</th>
           <th data-i18n="formularios.monto">Monto</th>
           <th data-i18n="gastos.ipc">IPC %</th>
@@ -103,6 +104,14 @@
           <td>
             <input type="text" id="hastaGasto" data-i18n-placeholder="formularios.placeholderYYYYMM" maxlength="7"
               pattern="\\d{4}-\\d{2}" data-i18n-title="formularios.formatoYYYYMM" title="Formato: YYYY-MM">
+          </td>
+          <td>
+            <select id="frecuenciaMensual" style="width:100%;">
+              <option value="1" data-i18n="gastos.frecMensual">Mensual</option>
+              <option value="3" data-i18n="gastos.frecTrimestral">Trimestral</option>
+              <option value="6" data-i18n="gastos.frecSemestral">Semestral</option>
+              <option value="12" data-i18n="gastos.frecAnual">Anual</option>
+            </select>
           </td>
           <td><input type="text" id="descMensual" data-i18n-placeholder="gastos.descripcion"></td>
           <td>

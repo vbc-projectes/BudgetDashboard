@@ -26,7 +26,7 @@ function cargarGastosForm() {
             mensuales: '#categoriaMensual'
         },
         customColumns: {
-            mensual: ['desde', 'hasta', 'descripcion', 'monto', 'ipc_porcentaje', 'monto_ajustado', 'categoria', 'notas']
+            mensual: ['desde', 'hasta', 'frecuencia_meses', 'descripcion', 'monto', 'ipc_porcentaje', 'monto_ajustado', 'categoria', 'notas']
         },
         showOldFlag: 'showOldGastos'
     });
@@ -204,6 +204,7 @@ function cargarGastosForm() {
         const monto = parseFloat(document.getElementById('montoMensual').value);
         const ipcPorcentaje = parseFloat(document.getElementById('ipcMensual')?.value);
         const categoria = document.getElementById('categoriaMensual').value;
+        const frecuenciaMeses = parseInt(document.getElementById('frecuenciaMensual')?.value) || 1;
         const ipcValue = Number.isNaN(ipcPorcentaje) ? 0 : ipcPorcentaje;
 
         // Validación de formato YYYY-MM
@@ -226,6 +227,7 @@ function cargarGastosForm() {
                 desde: desde,
                 hasta: hasta,
                 ipc_porcentaje: ipcValue,
+                frecuencia_meses: frecuenciaMeses,
                 notas: notasMensual
             })
         });
@@ -237,6 +239,8 @@ function cargarGastosForm() {
         document.getElementById('montoMensual').value = '';
         const ipcMensualInput = document.getElementById('ipcMensual');
         if (ipcMensualInput) ipcMensualInput.value = '';
+        const frecuenciaMensualSelect = document.getElementById('frecuenciaMensual');
+        if (frecuenciaMensualSelect) frecuenciaMensualSelect.value = '1';
         if (document.getElementById('notasMensual')) document.getElementById('notasMensual').value = '';
         
         gastosManager.loadData();

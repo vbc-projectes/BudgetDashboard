@@ -171,8 +171,11 @@ class CuentaRemuneradaService {
         const endForSeries = fullSeries ? (cuenta.hasta ? fechaFin : hoy) : endForHoy;
 
         const saldoSeries = [];
+        const interesesMensuales = [];
+        const aportacionesSeries = [];
         let interesAcum    = 0; // acumula toda la serie (puede incluir futuro si hay fechaFin)
         let interesAcumHoy = 0; // acumula sólo hasta min(hoy, fechaFin) → para los KPIs
+        let interesDelMes  = 0; // acumula interés del mes en curso para la serie de marcadores
         let saldoHoyVal   = null; // se capturará al llegar a endForHoy
 
         let current  = new Date(fechaInicio + 'T00:00:00');
@@ -187,7 +190,11 @@ class CuentaRemuneradaService {
 
             // Aportación mensual: primer día del mes, después del mes inicial
             if (fechaStr > fechaInicio && current.getDate() === 1 && curMonth !== prevMonth) {
-                saldo += aportacionEfectiva(fechaStr);
+                const apMonto = aportacionEfectiva(fechaStr);
+                saldo += apMonto;
+                if (fullSeries && apMonto > 0) {
+                    aportacionesSeries.push({ fecha: fechaStr, monto: parseFloat(apMonto.toFixed(2)) });
+                }
             }
             prevMonth = curMonth;
 
@@ -203,8 +210,27 @@ class CuentaRemuneradaService {
             // Interés diario acumulado (usa la tasa vigente en este día)
             const tasaDiariaHoy = tasaEfectiva(fechaStr) / 100 / 365;
             if (saldo > 0) {
-                interesAcum += saldo * tasaDiariaHoy;
-                if (fechaStr <= endForHoy) interesAcumHoy += saldo * tasaDiariaHoy;
+                const intDiario = saldo * tasaDiariaHoy;
+                interesAcum   += intDiario;
+                interesDelMes += intDiario;
+                if (fechaStr <= endForHoy) interesAcumHoy += intDiario;
+            }
+
+            // Acreditar interés al saldo el último día del mes o al final de la simulación
+            // (en cuentas reales el banco ingresa el interés bruto y retiene el impuesto aparte)
+            const lastDayOfMonth = new Date(current.getFullYear(), current.getMonth() + 1, 0).getDate();
+            const isMonthEnd     = current.getDate() === lastDayOfMonth;
+            const isSimEnd       = fechaStr === endForHoy;
+            if ((isMonthEnd || isSimEnd) && interesDelMes > 0) {
+                saldo += interesDelMes;
+                if (fullSeries) {
+                    interesesMensuales.push({
+                        fecha:        fechaStr,
+                        interesBruto: parseFloat(interesDelMes.toFixed(2)),
+                        interesNeto:  parseFloat((interesDelMes * (1 - retencion / 100)).toFixed(2))
+                    });
+                }
+                interesDelMes = 0;
             }
 
             const snapSaldo = parseFloat(saldo.toFixed(2));
@@ -226,6 +252,8 @@ class CuentaRemuneradaService {
         return {
             cuenta,
             saldoSeries,
+            interesesMensuales,
+            aportacionesSeries,
             saldoHoy:    saldoHoyVal,
             saldoActual: saldoHoyVal,
             saldoInvertido,

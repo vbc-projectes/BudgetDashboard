@@ -44,7 +44,12 @@ function errorHandler(err, req, res, next) {
     const logger = require('../utils/logger');
     logger.error(`${req.method} ${req.path} — ${err.message}`);
     if (config.NODE_ENV !== 'production') logger.debug(err.stack);
-    res.status(500).json({ 
+    if (res.headersSent) {
+        // Response already sent (e.g. the request timeout already replied with 408).
+        // Delegate to Express's default handler instead of trying to send again.
+        return next(err);
+    }
+    res.status(500).json({
         error: err.message || 'Internal server error',
         details: config.NODE_ENV === 'development' ? err.stack : undefined
     });

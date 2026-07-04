@@ -326,7 +326,7 @@ async function getAhorrosMes(desde, hasta, categoria_id = null) {
     const gastosP = await gastosPuntualesService.getByMonth(desde, hasta, categoria_id);
     agregarPuntualesPorMes(gastosP, meses, 'gastos');
 
-    let gastosMQuery = `SELECT monto, desde, hasta, ipc_porcentaje FROM gastos_mensuales`;
+    let gastosMQuery = `SELECT monto, desde, hasta, ipc_porcentaje, frecuencia_meses FROM gastos_mensuales`;
     const gastosMParams = [];
     if (categoria_id) {
         gastosMQuery += ' WHERE categoria_id = ?';
@@ -335,7 +335,7 @@ async function getAhorrosMes(desde, hasta, categoria_id = null) {
     const gastosM = await dbAll(db, gastosMQuery, gastosMParams);
     gastosM.forEach(g => {
         meses.forEach(m => {
-            if (esMensualActivo(m.mes, hastaDate, g.desde, g.hasta)) {
+            if (esMensualActivo(m.mes, hastaDate, g.desde, g.hasta, g.frecuencia_meses || 1)) {
                 const targetDate = new Date(`${m.mes}-01`);
                 m.gastos += calcularMontoIpc(g.monto, g.ipc_porcentaje, g.desde, targetDate);
             }
@@ -519,7 +519,7 @@ async function getCategoriasPeriodo(desde, hasta) {
 
     // Gastos mensuales con IPC
     const gastosM = await dbAll(db, `
-        SELECT c.nombre AS categoria, gm.monto, gm.desde, gm.hasta, gm.ipc_porcentaje
+        SELECT c.nombre AS categoria, gm.monto, gm.desde, gm.hasta, gm.ipc_porcentaje, gm.frecuencia_meses
         FROM gastos_mensuales gm
         JOIN categorias c ON gm.categoria_id = c.id
     `);
@@ -528,7 +528,7 @@ async function getCategoriasPeriodo(desde, hasta) {
     const mesesGastos = generarArrayMeses(desde, hasta, { monto: 0 });
     gastosM.forEach(gm => {
         mesesGastos.forEach(m => {
-            if (esMensualActivo(m.mes, hastaDate, gm.desde, gm.hasta)) {
+            if (esMensualActivo(m.mes, hastaDate, gm.desde, gm.hasta, gm.frecuencia_meses || 1)) {
                 const targetDate = new Date(`${m.mes}-01`);
                 const montoAdj = calcularMontoIpc(gm.monto, gm.ipc_porcentaje, gm.desde, targetDate);
                 gastosCombinados[gm.categoria] = (gastosCombinados[gm.categoria] || 0) + montoAdj;
@@ -644,14 +644,14 @@ async function getGastosCategoriaMes(desde, hasta) {
 
     // Gastos mensuales
     const gastosM = await dbAll(db, `
-        SELECT c.nombre AS categoria, gm.monto, gm.desde, gm.hasta, gm.ipc_porcentaje
+        SELECT c.nombre AS categoria, gm.monto, gm.desde, gm.hasta, gm.ipc_porcentaje, gm.frecuencia_meses
         FROM gastos_mensuales gm
         JOIN categorias c ON gm.categoria_id = c.id
     `);
 
     gastosM.forEach(g => {
         meses.forEach(m => {
-            if (esMensualActivo(m.mes, hastaDate, g.desde, g.hasta)) {
+            if (esMensualActivo(m.mes, hastaDate, g.desde, g.hasta, g.frecuencia_meses || 1)) {
                 const targetDate = new Date(`${m.mes}-01`);
                 const montoAdj = calcularMontoIpc(g.monto, g.ipc_porcentaje, g.desde, targetDate);
                 dataMesCat[m.mes][g.categoria] = (dataMesCat[m.mes][g.categoria] || 0) + montoAdj;
@@ -750,11 +750,18 @@ async function getResumenPeriodos() {
         let current = new Date(Math.max(rDesde, desdeDate));
         current.setDate(28);
         const end = new Date(Math.min(rHasta, hastaDate));
+        const fm = registro.frecuencia_meses > 1 ? registro.frecuencia_meses : 1;
+        const [dy, dm] = registro.desde.split('-').map(Number);
         let total = 0;
 
         while (current <= end) {
-            const targetDate = new Date(current.getFullYear(), current.getMonth(), 1);
-            total += calcularMontoIpc(registro.monto, registro.ipc_porcentaje, registro.desde, targetDate);
+            const cy = current.getFullYear();
+            const cm = current.getMonth() + 1;
+            const monthsElapsed = (cy - dy) * 12 + (cm - dm);
+            if (monthsElapsed % fm === 0) {
+                const targetDate = new Date(cy, current.getMonth(), 1);
+                total += calcularMontoIpc(registro.monto, registro.ipc_porcentaje, registro.desde, targetDate);
+            }
             current.setMonth(current.getMonth() + 1);
         }
 
@@ -791,7 +798,7 @@ async function getResumenPeriodos() {
     ] = await Promise.all([
         dbAll(db, `SELECT monto, desde, hasta FROM ingresos_mensuales LIMIT 1000`),
         dbAll(db, `SELECT monto, aportacion_mensual, interes, retencion, desde, hasta FROM cuenta_remunerada LIMIT 1000`),
-        dbAll(db, `SELECT monto, desde, hasta, ipc_porcentaje FROM gastos_mensuales LIMIT 1000`),
+        dbAll(db, `SELECT monto, desde, hasta, ipc_porcentaje, frecuencia_meses FROM gastos_mensuales LIMIT 1000`),
         dbAll(db, `SELECT bruto, monto, desde, hasta FROM ingresos_mensuales WHERE bruto IS NOT NULL AND bruto != monto LIMIT 1000`),
         dbAll(db, `SELECT monto, desde, hasta FROM impuestos_mensuales LIMIT 1000`),
         dbAll(db, qIngP.sql, qIngP.params),
@@ -978,9 +985,9 @@ async function getPresupuestosConGasto(mes, desde, hasta) {
         GROUP BY categoria_id
     `, [desdeStr, hastaStr]);
 
-    // Gastos mensuales: contar meses de solapamiento × monto
+    // Gastos mensuales: contar meses de pago reales (respeta frecuencia)
     const gastosMensRows = await dbAll(db, `
-        SELECT categoria_id, monto, desde, hasta
+        SELECT categoria_id, monto, desde, hasta, frecuencia_meses
         FROM gastos_mensuales
         WHERE desde <= ? AND (hasta >= ? OR hasta = '9999-12')
     `, [hastasMes, desdesMes]);
@@ -994,10 +1001,18 @@ async function getPresupuestosConGasto(mes, desde, hasta) {
         const overlapStart = gm.desde  > desdesMes  ? gm.desde  : desdesMes;
         const overlapEnd   = gmHasta   < hastasMes  ? gmHasta   : hastasMes;
         if (overlapStart > overlapEnd) continue;
-        const [sy, sm] = overlapStart.split('-').map(Number);
+        const fm = gm.frecuencia_meses > 1 ? gm.frecuencia_meses : 1;
+        const [dy, dm] = gm.desde.split('-').map(Number);
+        let [sy, sm] = overlapStart.split('-').map(Number);
         const [ey, em] = overlapEnd.split('-').map(Number);
-        const months = (ey - sy) * 12 + (em - sm) + 1;
-        gastoMap[gm.categoria_id] = (gastoMap[gm.categoria_id] || 0) + gm.monto * months;
+        let paymentMonths = 0;
+        while (sy < ey || (sy === ey && sm <= em)) {
+            const monthsElapsed = (sy - dy) * 12 + (sm - dm);
+            if (monthsElapsed % fm === 0) paymentMonths++;
+            sm++;
+            if (sm > 12) { sm = 1; sy++; }
+        }
+        gastoMap[gm.categoria_id] = (gastoMap[gm.categoria_id] || 0) + gm.monto * paymentMonths;
     }
 
     return presupuestos.map(p => {
@@ -1034,13 +1049,25 @@ async function getAnomalias(meses = 6) {
     const desdeRef = `${mesesRef[mesesRef.length - 1]}-01`;
     const hastaRef = `${mesesRef[0]}-31`;
 
-    const [puntRef, mensRef, puntActual, mensActual, categorias] = await Promise.all([
+    const [puntRef, mensRef, puntActual, mensActualRaw, categorias] = await Promise.all([
         dbAll(db, `SELECT categoria_id, fecha, monto FROM gastos_puntuales WHERE fecha >= ? AND fecha <= ?`, [desdeRef, hastaRef]),
-        dbAll(db, `SELECT categoria_id, monto, desde, hasta FROM gastos_mensuales`),
+        dbAll(db, `SELECT categoria_id, monto, desde, hasta, frecuencia_meses FROM gastos_mensuales`),
         dbAll(db, `SELECT categoria_id, IFNULL(SUM(monto),0) AS total FROM gastos_puntuales WHERE fecha >= ? AND fecha <= ? GROUP BY categoria_id`, [`${hoyMes}-01`, hoyStr]),
-        dbAll(db, `SELECT categoria_id, IFNULL(SUM(monto),0) AS total FROM gastos_mensuales WHERE desde <= ? AND hasta >= ? GROUP BY categoria_id`, [hoyMes, hoyMes]),
+        dbAll(db, `SELECT categoria_id, monto, desde, hasta, frecuencia_meses FROM gastos_mensuales WHERE desde <= ? AND (hasta >= ? OR hasta = '9999-12')`, [hoyMes, hoyMes]),
         dbAll(db, `SELECT id, nombre FROM categorias`)
     ]);
+
+    // Filtrar mensActual por frecuencia (solo incluir si hoyMes es mes de pago)
+    const mensActual = [];
+    for (const g of mensActualRaw) {
+        const fm = g.frecuencia_meses > 1 ? g.frecuencia_meses : 1;
+        const [dy, dm] = g.desde.split('-').map(Number);
+        const [ty, tm] = hoyMes.split('-').map(Number);
+        const monthsElapsed = (ty - dy) * 12 + (tm - dm);
+        if (monthsElapsed % fm === 0) {
+            mensActual.push({ categoria_id: g.categoria_id, total: g.monto });
+        }
+    }
 
     const catMap = {};
     for (const c of categorias) catMap[c.id] = c.nombre;
@@ -1053,10 +1080,16 @@ async function getAnomalias(meses = 6) {
         gastoByMesCat[mes][g.categoria_id] = (gastoByMesCat[mes][g.categoria_id] || 0) + g.monto;
     }
     for (const g of mensRef) {
+        const fm = g.frecuencia_meses > 1 ? g.frecuencia_meses : 1;
+        const [dy, dm] = g.desde.split('-').map(Number);
         for (const mes of mesesRef) {
-            if (g.desde <= mes && g.hasta >= mes) {
-                if (!gastoByMesCat[mes]) gastoByMesCat[mes] = {};
-                gastoByMesCat[mes][g.categoria_id] = (gastoByMesCat[mes][g.categoria_id] || 0) + g.monto;
+            if (g.desde <= mes && (g.hasta >= mes || g.hasta === '9999-12')) {
+                const [ty, tm] = mes.split('-').map(Number);
+                const monthsElapsed = (ty - dy) * 12 + (tm - dm);
+                if (monthsElapsed % fm === 0) {
+                    if (!gastoByMesCat[mes]) gastoByMesCat[mes] = {};
+                    gastoByMesCat[mes][g.categoria_id] = (gastoByMesCat[mes][g.categoria_id] || 0) + g.monto;
+                }
             }
         }
     }

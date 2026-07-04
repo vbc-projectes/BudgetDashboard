@@ -21,6 +21,17 @@ function initGastosCalendar() {
         return monto * Math.pow(1 + ipcPorcentaje / 100, tyear - dyear);
     }
 
+    function esMensualActivoFront(mesStr, desde, hasta, frecuenciaMeses) {
+        const d = desde || '0000-00';
+        const h = hasta || '9999-12';
+        if (mesStr < d || mesStr > h) return false;
+        const fm = frecuenciaMeses > 1 ? frecuenciaMeses : 1;
+        if (fm === 1) return true;
+        const [dy, dm] = d.split('-').map(Number);
+        const [ty, tm] = mesStr.split('-').map(Number);
+        return ((ty - dy) * 12 + (tm - dm)) % fm === 0;
+    }
+
     function fmtEur(n) {
         return new Intl.NumberFormat('es-ES', {
             style: 'currency', currency: 'EUR',
@@ -37,11 +48,7 @@ function initGastosCalendar() {
         );
 
         const mensuales = (calData.gastos_mensuales || [])
-            .filter(g => {
-                const desde = g.desde || '0000-00';
-                const hasta = g.hasta || '9999-12';
-                return mesStr >= desde && mesStr <= hasta;
-            })
+            .filter(g => esMensualActivoFront(mesStr, g.desde, g.hasta, g.frecuencia_meses || 1))
             .map(g => ({
                 ...g,
                 monto_mes: calcMontoIpcFront(g.monto, g.ipc_porcentaje, g.desde, mesStr)

@@ -1182,7 +1182,19 @@ function _renderCRChart(data) {
         tiposDates[f] = ti.interes;
     }
 
-    // Función de color por fecha (prioridad: ajuste > compra > venta > tipo_interés > dividendo)
+    // ── Mapa de intereses mensuales generados ──
+    const interesDates = {};
+    for (const im of (data.interesesMensuales || [])) {
+        interesDates[im.fecha] = im;
+    }
+
+    // ── Mapa de aportaciones mensuales ──
+    const aportDates = {};
+    for (const ap of (data.aportacionesSeries || [])) {
+        aportDates[ap.fecha] = ap.monto;
+    }
+
+    // Función de color por fecha (prioridad: ajuste > compra/venta > tipo_interés > dividendo > interés > aportación)
     function pointColor(f) {
         if (ajusteDates[f] !== undefined) return '#8b5cf6';
         if (opDates[f]) {
@@ -1192,12 +1204,16 @@ function _renderCRChart(data) {
         }
         if (tiposDates[f] !== undefined) return '#06b6d4';
         if (divDates[f]) return '#f59e0b';
+        if (interesDates[f]) return '#f97316';
+        if (aportDates[f] !== undefined) return '#3b82f6';
         return 'transparent';
     }
 
     function pointSize(f) {
         if (ajusteDates[f] !== undefined) return 7;
         if (opDates[f] || tiposDates[f] !== undefined || divDates[f]) return 5;
+        if (interesDates[f]) return 4;
+        if (aportDates[f] !== undefined) return 4;
         return 0;
     }
 
@@ -1234,11 +1250,15 @@ function _renderCRChart(data) {
                             const div = divDates[f];
                             const aj  = ajusteDates[f];
                             const ti  = tiposDates[f];
+                            const im  = interesDates[f];
+                            const ap  = aportDates[f];
                             let extra = '';
                             if (ops) extra += ' — ' + ops.map(t => t === 'compra' ? '▼ Compra' : '▲ Venta').join(', ');
                             if (div !== undefined) extra += ` — ★ Dividendo neto: +${_fmt(div)}`;
                             if (aj  !== undefined) extra += ` — ✎ Ajuste saldo → ${_fmt(aj)}`;
                             if (ti  !== undefined) extra += ` — % Nuevo tipo: ${ti}%`;
+                            if (im  !== undefined) extra += ` — ◈ Interés neto: +${_fmt(im.interesNeto)}`;
+                            if (ap  !== undefined) extra += ` — ↑ Aportación: +${_fmt(ap)}`;
                             return ` Saldo: ${_fmt(ctx.parsed.y)}${extra}`;
                         }
                     }
@@ -1260,7 +1280,9 @@ function _renderCRChart(data) {
             { color: '#22c55e', label: '▲ Venta' },
             { color: '#f59e0b', label: '★ Dividendo' },
             { color: '#8b5cf6', label: '✎ Ajuste saldo' },
-            { color: '#06b6d4', label: '% Cambio tipo' }
+            { color: '#06b6d4', label: '% Cambio tipo' },
+            { color: '#f97316', label: '◈ Interés mes' },
+            { color: '#3b82f6', label: '↑ Aportación' }
         ];
         legendEl.innerHTML = items.map(it =>
             `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:12px;">

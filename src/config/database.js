@@ -1,6 +1,7 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const config = require('./config');
+const logger = require('../utils/logger');
 
 let currentDb = null;
 let currentDbPath = null;
@@ -15,6 +16,9 @@ function initDb(dbPath) {
 	currentDbPath = resolveDbPath(dbPath);
 	currentDb = new sqlite3.Database(currentDbPath);
 	currentDb.run('PRAGMA foreign_keys = ON');
+	if (currentDbPath !== ':memory:') {
+		logger.debug(`Database connected: ${path.basename(path.dirname(currentDbPath))}/${path.basename(currentDbPath)}`);
+	}
 }
 
 async function setDbPath(dbPath) {
@@ -23,6 +27,7 @@ async function setDbPath(dbPath) {
 
 	await new Promise((resolve, reject) => {
 		if (!currentDb) return resolve();
+		logger.debug(`Database closing: ${path.basename(currentDbPath)}`);
 		currentDb.close(err => (err ? reject(err) : resolve()));
 	});
 
