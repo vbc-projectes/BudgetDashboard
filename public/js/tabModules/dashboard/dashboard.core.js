@@ -991,10 +991,13 @@ function obtenerLabelsTraducidos() {
             const css = getComputedStyle(document.documentElement);
             const chartTextColor = (css.getPropertyValue('--text-secondary') || '#475569').trim();
             const chartGridSoft = (css.getPropertyValue('--border-light') || '#e2e8f0').trim();
+            // Menos etiquetas en pantallas estrechas: con maxRotation:0, "8" no cabe
+            // sin solaparse en un móvil, aunque autoSkip lo permita en desktop.
+            const xTicksLimit = window.innerWidth < 480 ? 4 : (window.innerWidth < 768 ? 6 : 8);
 
             const optComun = {
                 responsive: true,
-                maintainAspectRatio: true,
+                maintainAspectRatio: false,
                 elements: {
                     line: {
                         tension: 0.38,
@@ -1042,7 +1045,7 @@ function obtenerLabelsTraducidos() {
                         grid: { color: chartGridSoft }
                     },
                     x: {
-                        ticks: { color: chartTextColor, font: { size: 11 } },
+                        ticks: { color: chartTextColor, font: { size: 11 }, maxRotation: 0, autoSkip: true, autoSkipPadding: 24, maxTicksLimit: xTicksLimit },
                         grid: { color: 'rgba(148, 163, 184, 0.18)' }
                     }
                 }
@@ -1244,7 +1247,7 @@ function obtenerLabelsTraducidos() {
                             grid: { color: chartGridSoft }
                         },
                         x: {
-                            ticks: { color: chartTextColor, font: { size: 10 } },
+                            ticks: { color: chartTextColor, font: { size: 10 }, maxRotation: 0, autoSkip: true, autoSkipPadding: 24, maxTicksLimit: xTicksLimit },
                             grid: { color: 'rgba(148, 163, 184, 0.18)' }
                         }
                     }

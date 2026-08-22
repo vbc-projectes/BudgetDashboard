@@ -6,7 +6,7 @@
 // exactly as it does today — this file adds an offline/caching layer,
 // it does not change what any request returns while online.
 
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v3';
 const CACHE_NAME = `dashboard-shell-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -17,6 +17,8 @@ const APP_SHELL = [
     '/manifest.json',
     '/favicon.svg',
     '/favicon.ico',
+    '/apple-touch-icon.png',
+    '/apple-touch-icon-precomposed.png',
     '/icons/icon-192.png',
     '/icons/icon-512.png',
     '/icons/icon-512-maskable.png',

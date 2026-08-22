@@ -136,7 +136,7 @@
                 '<div id="dashCompMetricSel" style="display:flex;gap:4px;margin-left:auto;flex-wrap:wrap;"></div>' +
             '</div>' +
             '<div id="dashTablaFiltros" style="margin:0 0 14px;"></div>' +
-            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:20px;">' +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(420px,100%),1fr));gap:20px;">' +
                 '<div style="min-width:0;">' +
                     '<p style="' + subStyle + '">Barras agrupadas por año</p>' +
                     '<div style="position:relative;height:300px;"><canvas id="dashCompBar"></canvas></div>' +

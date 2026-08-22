@@ -3,6 +3,8 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    /* Evita el zoom por doble-tap en móvil/PWA (mantiene el pinch-zoom manual). */
+    touch-action: manipulation;
 }
 
 /* ==================== VARIABLES Y COLORES ==================== */
@@ -97,11 +99,23 @@
     --shift-right: translate3d(4px, 0, 0);
 }
 
+html {
+    overscroll-behavior-y: none;
+}
+
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-primary-dark) 100%);
     min-height: 100vh;
     color: var(--text-primary);
+    overscroll-behavior-y: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
+}
+
+button, a, .tablink, .btn-archivo, [role="button"] {
+    -webkit-tap-highlight-color: transparent;
 }
 
 :where(button, input, select, textarea, a, [tabindex]):focus-visible {
@@ -1247,6 +1261,119 @@ table {
     pointer-events: none;
     opacity: 0.7;
     font-style: italic;
+}
+
+/* ==================== TABLAS -> TARJETAS EN MÓVIL ====================
+   Las tablas con muchas columnas (Gastos, Ingresos, Impuestos) reciben la
+   clase .table-card-mobile desde TransactionManager.js, que también vuelca
+   el texto de cada <th> en data-label de su <td> correspondiente. En vez
+   de desplazamiento horizontal, cada <tr> pasa a ser una tarjeta vertical
+   con "Etiqueta: valor" por fila — no requiere tocar la lógica de datos,
+   solo cambia cómo se presenta lo mismo. */
+@media (max-width: 700px) {
+    table.table-card-mobile thead tr:first-child {
+        display: none;
+    }
+
+    table.table-card-mobile,
+    table.table-card-mobile thead,
+    table.table-card-mobile tbody,
+    table.table-card-mobile tr {
+        display: block;
+        width: 100%;
+    }
+
+    table.table-card-mobile tbody tr {
+        margin-bottom: 10px;
+        border: 1px solid var(--border-light);
+        border-radius: var(--border-radius);
+        padding: 2px 10px;
+        background: var(--bg-white);
+        box-shadow: var(--shadow-sm);
+    }
+
+    table.table-card-mobile tr.insert-row {
+        background: var(--background-secondary);
+        border-style: dashed;
+    }
+
+    table.table-card-mobile td {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: var(--spacing-md);
+        padding: 7px 2px;
+        border: none;
+        border-bottom: 1px solid var(--border-light);
+        text-align: right;
+        white-space: normal;
+    }
+
+    table.table-card-mobile tr td:last-child {
+        border-bottom: none;
+    }
+
+    /* Fila de filtros por columna (table-filters.js): en vez de un filtro
+       por línea (una tabla de 6 columnas = 6 líneas), un grid compacto que
+       envuelve varios filtros pequeños por fila. */
+    table.table-card-mobile tr.table-filter-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 8px;
+        margin-bottom: 10px;
+        border: 1px dashed var(--border-light);
+        border-radius: var(--border-radius);
+        background: var(--background-secondary);
+    }
+
+    table.table-card-mobile tr.table-filter-row td.table-filter-cell {
+        display: block;
+        flex: 1 1 120px;
+        min-width: 100px;
+        padding: 0;
+        border: none;
+    }
+
+    table.table-card-mobile tr.table-filter-row td.table-filter-cell.is-action {
+        display: none;
+    }
+
+    table.table-card-mobile tr.table-filter-row .table-column-filter-control {
+        width: 100%;
+        font-size: 0.78rem;
+        padding: 5px 8px;
+    }
+
+    table.table-card-mobile td[data-label]::before {
+        content: attr(data-label);
+        font-weight: 600;
+        font-size: 0.78rem;
+        color: var(--text-tertiary);
+        text-align: left;
+        margin-right: auto;
+    }
+
+    /* Fila de alta: sin etiquetas propias (los placeholders ya orientan),
+       los controles ocupan todo el ancho en vez de quedar apretados. */
+    table.table-card-mobile tr.insert-row td {
+        justify-content: stretch;
+    }
+
+    table.table-card-mobile tr.insert-row td > * {
+        width: 100%;
+    }
+
+    /* Ya no hace falta desplazar horizontalmente ni avisar de ello. */
+    .table-container:has(table.table-card-mobile) {
+        overflow-x: visible;
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .table-container:has(table.table-card-mobile)::after {
+        content: none;
+    }
 }
 
 /* Tabla de Assets con scroll horizontal */

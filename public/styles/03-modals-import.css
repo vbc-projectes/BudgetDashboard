@@ -990,6 +990,20 @@
     .categorization-table td {
         padding: var(--spacing-sm);
     }
+
+    .archivo-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--spacing-md);
+    }
+
+    .archivo-acciones {
+        flex-wrap: wrap;
+    }
+
+    .btn-archivo {
+        flex: 1 1 auto;
+    }
 }
 
 @media (max-width: 480px) {

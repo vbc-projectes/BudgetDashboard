@@ -479,19 +479,18 @@
     min-width: 180px;
 }
 
-#dashboard .chart-card canvas {
+#dashboard .chart-card canvas:not(#dashCompBar):not(#dashCompLine) {
     height: 340px !important;
     max-height: 340px;
 }
 
-#dashboard .chart-card.full-width canvas {
+#dashboard .chart-card.full-width canvas:not(#dashCompBar):not(#dashCompLine) {
     height: 315px !important;
     max-height: 315px;
 }
 
 #chartPorcentajes {
     min-height: 340px;
-    max-height: 340px !important;
 }
 
 .porcentajes-3d {
@@ -1160,19 +1159,40 @@
         margin-bottom: var(--spacing-md);
     }
 
-    #dashboard .chart-card canvas {
-        height: 220px !important;
-        max-height: 220px;
+    #dashboard .chart-card canvas:not(#dashCompBar):not(#dashCompLine) {
+        height: 320px !important;
+        max-height: 320px;
     }
 
-    #dashboard .chart-card.full-width canvas {
-        height: 200px !important;
-        max-height: 200px;
+    #dashboard .chart-card.full-width canvas:not(#dashCompBar):not(#dashCompLine) {
+        height: 300px !important;
+        max-height: 300px;
     }
 
     .filtro-categoria {
         font-size: 0.8rem;
         padding: var(--spacing-sm) var(--spacing-md);
+    }
+
+    /* Selector de años/meses de "Comparativa interanual": en escritorio son
+       unas pocas píldoras, pero con 20-30 años se convierten en una pared de
+       botones que empuja los gráficos varias pantallas hacia abajo. En móvil
+       se comprimen y se limita su altura con scroll interno, igual que ya
+       hacemos con las tablas anchas. */
+    #dashTablaFiltros > div {
+        gap: 3px !important;
+        margin-bottom: 3px !important;
+    }
+
+    #dashTablaFiltros button {
+        padding: 1px 7px !important;
+        font-size: 0.68rem !important;
+    }
+
+    #dashTablaFiltros {
+        max-height: 112px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     .btn-periodo,

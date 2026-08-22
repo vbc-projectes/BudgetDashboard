@@ -99,11 +99,12 @@ class TransactionManager {
         if (this.tables.puntuales && this.endpoints.puntuales) {
             const tbody = document.querySelector(this.tables.puntuales);
             if (tbody) {
+                const headers = this.getHeaderLabels(tbody);
                 tbody.innerHTML = '';
                 const items = data[this.endpoints.puntuales] || [];
                 items.forEach(item => {
                     if (!this.shouldShowItem(item, today, 'puntual')) return;
-                    const tr = this.createTableRow(item, 'puntual');
+                    const tr = this.createTableRow(item, 'puntual', headers);
                     tbody.appendChild(tr);
                 });
                 this.attachRowEvents(tbody, 'puntual');
@@ -114,11 +115,12 @@ class TransactionManager {
         if (this.tables.mensuales && this.endpoints.mensuales) {
             const tbody = document.querySelector(this.tables.mensuales);
             if (tbody) {
+                const headers = this.getHeaderLabels(tbody);
                 tbody.innerHTML = '';
                 const items = data[this.endpoints.mensuales] || [];
                 items.forEach(item => {
                     if (!this.shouldShowItem(item, today, 'mensual')) return;
-                    const tr = this.createTableRow(item, 'mensual');
+                    const tr = this.createTableRow(item, 'mensual', headers);
                     tbody.appendChild(tr);
                 });
                 this.attachRowEvents(tbody, 'mensual');
@@ -129,11 +131,12 @@ class TransactionManager {
         if (this.tables.cuentaRemunerada && this.endpoints.cuentaRemunerada) {
             const tbody = document.querySelector(this.tables.cuentaRemunerada);
             if (tbody) {
+                const headers = this.getHeaderLabels(tbody);
                 tbody.innerHTML = '';
                 const items = data[this.endpoints.cuentaRemunerada] || [];
                 items.forEach(item => {
                     if (!this.shouldShowItem(item, today, 'cuentaRemunerada')) return;
-                    const tr = this.createTableRow(item, 'cuentaRemunerada');
+                    const tr = this.createTableRow(item, 'cuentaRemunerada', headers);
                     tbody.appendChild(tr);
                 });
                 this.attachRowEvents(tbody, 'cuentaRemunerada');
@@ -166,17 +169,32 @@ class TransactionManager {
     }
 
     // ===== CREAR FILA DE TABLA =====
-    createTableRow(item, type) {
+    // `headers` son los textos de las <th> de esa tabla (mismo orden que las
+    // columnas) — se vuelcan en data-label para que el CSS pueda mostrar
+    // "Fecha: ..." delante de cada celda cuando la tabla pasa a formato
+    // tarjeta en móvil, sin duplicar las traducciones aquí.
+    createTableRow(item, type, headers = []) {
         const tr = document.createElement('tr');
         tr.dataset.id = item.id;
         tr.dataset.type = type;
 
         const columns = this.getColumns(type);
-        const cells = columns.map(col => this.createCell(item, col)).join('');
+        const cells = columns.map((col, i) => this.createCell(item, col, headers[i])).join('');
         const actions = this.createActionButtons(item, type);
 
         tr.innerHTML = `${cells}${actions}`;
         return tr;
+    }
+
+    /** Lee los textos de cabecera (<th>) de la tabla asociada a ese tbody y
+     *  marca la tabla para que el CSS la convierta en tarjetas en móvil
+     *  (ver .table-card-mobile en 01-base.css). */
+    getHeaderLabels(tbody) {
+        const table = tbody && tbody.closest('table');
+        table?.classList.add('table-card-mobile');
+        const headerRow = table?.querySelector('thead tr:first-child');
+        if (!headerRow) return [];
+        return Array.from(headerRow.children).map(th => th.textContent.trim());
     }
 
     getColumns(type) {
@@ -193,7 +211,7 @@ class TransactionManager {
         return [];
     }
 
-    createCell(item, column) {
+    createCell(item, column, label) {
         const rawValue = item[column] !== undefined ? item[column] : '';
         let content = rawValue;
         
@@ -225,7 +243,8 @@ class TransactionManager {
             content = this.escapeHtml(content);
         }
 
-        return `<td class="editable" data-field="${column}" data-value="${this.escapeHtml(String(rawValue))}">${content}</td>`;
+        const labelAttr = label ? ` data-label="${this.escapeHtml(label)}"` : '';
+        return `<td class="editable" data-field="${column}" data-value="${this.escapeHtml(String(rawValue))}"${labelAttr}>${content}</td>`;
     }
 
     createActionButtons(item, type = '') {
