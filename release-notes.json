@@ -1,5 +1,7 @@
 {
   "Instructions": "UPDATE: Remember to copy the usuarios folder from the app's root directory and paste it back after the update.",
-  "newFeatures": [],
+  "newFeatures": [
+    "Added pwa"
+  ],
   "bugFixes": []
 }
