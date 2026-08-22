@@ -36,6 +36,21 @@ function _fmtNum(val, decimals = 4) {
     const n = Number(val);
     return Number.isFinite(n) ? n.toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: decimals }) : '—';
 }
+// Ejecuta `worker` sobre `items` con un máximo de `limit` peticiones en vuelo a la vez.
+// Evita disparar una petición HTTP por ticker simultáneamente sin límite (cada una puede
+// tardar varios segundos si Yahoo Finance está lento), lo que saturaba el servidor y
+// disparaba timeouts cuando la cartera tenía muchos tickers.
+async function _fetchConcurrencyLimited(items, limit, worker) {
+    let idx = 0;
+    async function run() {
+        while (idx < items.length) {
+            const i = idx++;
+            await worker(items[i], i);
+        }
+    }
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, run));
+}
+
 function _fmtPct(val) {
     const n = Number(val);
     if (!Number.isFinite(n)) return '—';
@@ -294,14 +309,14 @@ async function _renderEvolutionChart(period) {
         // Use ALL tickers ever traded (including closed positions) so historical P&L is accurate
         const allTickers = [...new Set(_inv.operaciones.map(o => o.ticker).filter(Boolean))];
 
-        // Fetch cached history per ticker in parallel
+        // Fetch cached history per ticker, con concurrencia limitada
         const historias = {};
-        await Promise.all(allTickers.map(async ticker => {
+        await _fetchConcurrencyLimited(allTickers, 4, async ticker => {
             try {
                 const r = await fetch(`/bolsa/ticker-history/${encodeURIComponent(ticker)}`);
                 if (r.ok) { const j = await r.json(); historias[ticker] = j.data || []; }
             } catch (_) {}
-        }));
+        });
 
         // Period cutoff
         const monthsMap = { '3mo': 3, '6mo': 6, '1y': 12, '2y': 24 };

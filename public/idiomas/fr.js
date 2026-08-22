@@ -151,7 +151,6 @@ TRADUCCIONES.fr = {
             // ===== PARAMÈTRES =====
             ajustes: {
                 titulo: 'Paramètres',
-                descripcion: 'Configurer le thème, la langue et la devise de travail',
                 usuarioActivo: 'Utilisateur actif',
                 cambiarUsuarioSidebar: 'Vous pouvez changer d\'utilisateur depuis le sélecteur de profils.',
                 retencionDividendos: 'Retenue dividendes (%):',

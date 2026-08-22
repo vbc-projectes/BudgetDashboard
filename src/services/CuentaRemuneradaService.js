@@ -15,7 +15,37 @@
 const db = require('../config/database');
 const { dbGet, dbAll } = require('../utils/dbHelpers');
 
+// Caché corta de la simulación día-a-día — misma TTL que el resto de cachés
+// de agregación del dashboard. Evita recorrer todo el histórico varias veces
+// cuando el home/dashboard dispara varias llamadas seguidas (p.ej. periodo
+// actual + anterior) que acaban pidiendo la misma simulación.
+const CACHE_TTL_MS = 60000;
+const _simulateCache = new Map();        // key: fullSeries|retencionDivPct|hastaFecha
+const _interesesPorMesCache = new Map(); // key: desde|hasta
+let _informeFiscalCache = null;          // { time, data }
+
+function _pruneIfTooBig(map, maxSize = 20) {
+    if (map.size > maxSize) map.clear();
+}
+
+// Igual que dashboardService: la caché se key-ea también por la ruta de la BD activa,
+// para que un cambio de usuario (db.__setDbPath) no sirva datos de otro usuario.
+function _dbPathKey() {
+    return typeof db.__getDbPath === 'function' ? db.__getDbPath() : 'default';
+}
+
 class CuentaRemuneradaService {
+
+    /**
+     * Invalida la caché de simulación. Debe llamarse tras cualquier escritura que
+     * afecte al cálculo (cuenta_remunerada, aportaciones, ajustes, tipos de interés,
+     * operaciones de bolsa o dividendos), para que la siguiente lectura recalcule.
+     */
+    static invalidateCache() {
+        _simulateCache.clear();
+        _interesesPorMesCache.clear();
+        _informeFiscalCache = null;
+    }
 
     /** Formatea un Date como YYYY-MM-DD usando hora local (evita desfase UTC) */
     static _toLocalDateStr(d) {
@@ -47,6 +77,12 @@ class CuentaRemuneradaService {
      *                                    permitir proyecciones futuras o balances históricos.
      */
     async _simulate(fullSeries, retencionDivPct = 0, hastaFecha = null) {
+        const cacheKey = `${_dbPathKey()}|${fullSeries}|${retencionDivPct}|${hastaFecha || ''}`;
+        const cached = _simulateCache.get(cacheKey);
+        if (cached && (Date.now() - cached.time) < CACHE_TTL_MS) {
+            return cached.data;
+        }
+
         // Obtener CR vinculada (o la primera disponible si no hay ninguna vinculada)
         let cuenta = await dbGet(db,
             `SELECT * FROM cuenta_remunerada WHERE linked_to_bolsa = 1 ORDER BY created_at LIMIT 1`
@@ -122,13 +158,16 @@ class CuentaRemuneradaService {
             [cuenta.id]
         );
 
+        // fechaStr se pasa en orden ascendente (se recorre día a día), así que basta
+        // con un puntero que avanza monotónicamente en vez de reescanear desde el inicio.
+        let _tasaIdx = 0;
+        let _tasaActual = tasaBase;
         function tasaEfectiva(fechaStr) {
-            let tasa = tasaBase;
-            for (const t of (tiposInteres || [])) {
-                if (t.desde <= fechaStr) tasa = parseFloat(t.interes);
-                else break;
+            while (_tasaIdx < tiposInteres.length && tiposInteres[_tasaIdx].desde <= fechaStr) {
+                _tasaActual = parseFloat(tiposInteres[_tasaIdx].interes);
+                _tasaIdx++;
             }
-            return tasa;
+            return _tasaActual;
         }
 
         const tasaAnual  = tasaBase; // kept for tasaAnualEfectiva KPI (base rate)
@@ -156,13 +195,14 @@ class CuentaRemuneradaService {
          * - Si hay aportaciones variables, usa la última cuyo `desde` <= fechaStr.
          * - Si no hay ninguna aplicable, usa cuenta.aportacion_mensual (valor base).
          */
+        let _apIdx = 0;
+        let _apActual = parseFloat(cuenta.aportacion_mensual) || 0;
         function aportacionEfectiva(fechaStr) {
-            let valor = parseFloat(cuenta.aportacion_mensual) || 0;
-            for (const ap of (aportaciones || [])) {
-                if (ap.desde <= fechaStr) valor = parseFloat(ap.cantidad);
-                else break;
+            while (_apIdx < aportaciones.length && aportaciones[_apIdx].desde <= fechaStr) {
+                _apActual = parseFloat(aportaciones[_apIdx].cantidad);
+                _apIdx++;
             }
-            return valor;
+            return _apActual;
         }
 
         // Límite para saldoHoy: min(hoy, fechaFin)
@@ -249,7 +289,7 @@ class CuentaRemuneradaService {
         const interesAcumuladoBruto = parseFloat(interesAcumHoy.toFixed(2));
         const interesAcumuladoNeto  = parseFloat((interesAcumHoy * (1 - retencion / 100)).toFixed(2));
 
-        return {
+        const result = {
             cuenta,
             saldoSeries,
             interesesMensuales,
@@ -263,6 +303,10 @@ class CuentaRemuneradaService {
             ajustes:      (ajustesRows  || []).map(a => ({ fecha: (a.fecha || '').slice(0, 10), saldo: parseFloat(a.saldo) })),
             tiposInteres: (tiposInteres || []).map(t => ({ desde: (t.desde || '').slice(0, 7), interes: parseFloat(t.interes) }))
         };
+
+        _pruneIfTooBig(_simulateCache);
+        _simulateCache.set(cacheKey, { time: Date.now(), data: result });
+        return result;
     }
 
     /**
@@ -271,6 +315,11 @@ class CuentaRemuneradaService {
      * @returns {Promise<Array<{anio, interes_bruto, retencion_pct, interes_neto}>>}
      */
     async getInformeFiscal() {
+        const dbKey = _dbPathKey();
+        if (_informeFiscalCache && _informeFiscalCache.key === dbKey && (Date.now() - _informeFiscalCache.time) < CACHE_TTL_MS) {
+            return _informeFiscalCache.data;
+        }
+
         let cuenta = await dbGet(db, `SELECT * FROM cuenta_remunerada WHERE linked_to_bolsa = 1 ORDER BY created_at LIMIT 1`);
         if (!cuenta) cuenta = await dbGet(db, `SELECT * FROM cuenta_remunerada ORDER BY created_at LIMIT 1`);
         if (!cuenta) return [];
@@ -311,22 +360,24 @@ class CuentaRemuneradaService {
 
         const ajusteMap = new Map((ajustesRows || []).map(a => [a.fecha.slice(0, 10), parseFloat(a.saldo)]));
 
+        let _tasaFiscalIdx = 0;
+        let _tasaFiscalActual = tasaBase;
         const tasaEfFiscal = (fechaStr) => {
-            let tasa = tasaBase;
-            for (const t of (tiposInteres || [])) {
-                if (t.desde <= fechaStr) tasa = parseFloat(t.interes);
-                else break;
+            while (_tasaFiscalIdx < tiposInteres.length && tiposInteres[_tasaFiscalIdx].desde <= fechaStr) {
+                _tasaFiscalActual = parseFloat(tiposInteres[_tasaFiscalIdx].interes);
+                _tasaFiscalIdx++;
             }
-            return tasa;
+            return _tasaFiscalActual;
         };
 
+        let _apFiscalIdx = 0;
+        let _apFiscalActual = parseFloat(cuenta.aportacion_mensual) || 0;
         const aportEf = (fechaStr) => {
-            let valor = parseFloat(cuenta.aportacion_mensual) || 0;
-            for (const ap of (aportaciones || [])) {
-                if (ap.desde <= fechaStr) valor = parseFloat(ap.cantidad);
-                else break;
+            while (_apFiscalIdx < aportaciones.length && aportaciones[_apFiscalIdx].desde <= fechaStr) {
+                _apFiscalActual = parseFloat(aportaciones[_apFiscalIdx].cantidad);
+                _apFiscalIdx++;
             }
-            return valor;
+            return _apFiscalActual;
         };
 
         let saldo = parseFloat(cuenta.monto) || 0;
@@ -352,12 +403,15 @@ class CuentaRemuneradaService {
             current.setDate(current.getDate() + 1);
         }
 
-        return Object.entries(interesAnio).sort(([a], [b]) => a.localeCompare(b)).map(([anio, bruto]) => ({
+        const resultado = Object.entries(interesAnio).sort(([a], [b]) => a.localeCompare(b)).map(([anio, bruto]) => ({
             anio,
             interes_bruto: parseFloat(bruto.toFixed(2)),
             retencion_pct: retencion,
             interes_neto:  parseFloat((bruto * (1 - retencion / 100)).toFixed(2))
         }));
+
+        _informeFiscalCache = { time: Date.now(), data: resultado, key: dbKey };
+        return resultado;
     }
 
     /**
@@ -395,6 +449,12 @@ class CuentaRemuneradaService {
      * @returns {Promise<Object>} { 'YYYY-MM': { bruto, neto } }
      */
     async getInteresesPorMes(desde, hasta) {
+        const cacheKey = `${_dbPathKey()}|${desde}|${hasta}`;
+        const cachedIPM = _interesesPorMesCache.get(cacheKey);
+        if (cachedIPM && (Date.now() - cachedIPM.time) < CACHE_TTL_MS) {
+            return cachedIPM.data;
+        }
+
         let cuenta = await dbGet(db,
             `SELECT * FROM cuenta_remunerada WHERE linked_to_bolsa = 1 ORDER BY created_at LIMIT 1`
         );
@@ -443,22 +503,24 @@ class CuentaRemuneradaService {
 
         const ajusteByFecha = new Map((ajustesRows || []).map(a => [a.fecha.slice(0, 10), parseFloat(a.saldo)]));
 
+        let _tasaIpmIdx = 0;
+        let _tasaIpmActual = tasaBase;
         function tasaEfectiva(fechaStr) {
-            let tasa = tasaBase;
-            for (const t of (tiposInteres || [])) {
-                if (t.desde <= fechaStr) tasa = parseFloat(t.interes);
-                else break;
+            while (_tasaIpmIdx < tiposInteres.length && tiposInteres[_tasaIpmIdx].desde <= fechaStr) {
+                _tasaIpmActual = parseFloat(tiposInteres[_tasaIpmIdx].interes);
+                _tasaIpmIdx++;
             }
-            return tasa;
+            return _tasaIpmActual;
         }
 
+        let _apIpmIdx = 0;
+        let _apIpmActual = parseFloat(cuenta.aportacion_mensual) || 0;
         function aportacionEfectiva(fechaStr) {
-            let valor = parseFloat(cuenta.aportacion_mensual) || 0;
-            for (const ap of (aportaciones || [])) {
-                if (ap.desde <= fechaStr) valor = parseFloat(ap.cantidad);
-                else break;
+            while (_apIpmIdx < aportaciones.length && aportaciones[_apIpmIdx].desde <= fechaStr) {
+                _apIpmActual = parseFloat(aportaciones[_apIpmIdx].cantidad);
+                _apIpmIdx++;
             }
-            return valor;
+            return _apIpmActual;
         }
 
         let saldo = parseFloat(cuenta.monto) || 0;
@@ -496,6 +558,8 @@ class CuentaRemuneradaService {
             v.bruto = parseFloat(v.bruto.toFixed(4));
         }
 
+        _pruneIfTooBig(_interesesPorMesCache);
+        _interesesPorMesCache.set(cacheKey, { time: Date.now(), data: interesPorMes });
         return interesPorMes;
     }
 }

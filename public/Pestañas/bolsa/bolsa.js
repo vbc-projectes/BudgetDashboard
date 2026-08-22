@@ -26,6 +26,18 @@ function fmtNum(val, decimals = 4) {
     return Number.isFinite(n) ? n.toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: decimals }) : '—';
 }
 
+// Ejecuta `worker` sobre `items` con un máximo de `limit` peticiones en vuelo a la vez.
+async function fetchConcurrencyLimited(items, limit, worker) {
+    let idx = 0;
+    async function run() {
+        while (idx < items.length) {
+            const i = idx++;
+            await worker(items[i], i);
+        }
+    }
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, run));
+}
+
 function fmtPct(val) {
     const n = Number(val);
     if (!Number.isFinite(n)) return '—';
@@ -224,16 +236,16 @@ async function renderBenchmarkChart() {
         const portfolioByDate = {};
         const totalCoste = posiciones.reduce((s, p) => s + p.coste_total, 0);
 
-        for (const pos of posiciones) {
+        await fetchConcurrencyLimited(posiciones, 4, async pos => {
             try {
                 const r2 = await fetch(`/bolsa/ticker-history/${encodeURIComponent(pos.ticker)}`);
-                if (!r2.ok) continue;
+                if (!r2.ok) return;
                 const h2 = await r2.json();
                 for (const row of (h2?.data || [])) {
                     portfolioByDate[row.fecha] = (portfolioByDate[row.fecha] || 0) + pos.cantidad * row.precio_cierre;
                 }
             } catch (_) {}
-        }
+        });
 
         const portfolioValues = benchLabels.map(d => portfolioByDate[d] ?? null);
         const firstPortVal = portfolioValues.find(v => v !== null);

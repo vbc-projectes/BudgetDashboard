@@ -147,7 +147,6 @@ TRADUCCIONES.es = {
             // ===== AJUSTES =====
             ajustes: {
                 titulo: 'Ajustes',
-                descripcion: 'Configura tema, idioma y moneda de trabajo',
                 usuarioActivo: 'Usuario activo',
                 cambiarUsuarioSidebar: 'Puedes cambiar de usuario desde el selector de perfiles.',
                 retencionDividendos: 'Retención dividendos (%):',

@@ -668,6 +668,7 @@ async function applyUserSelection(name, { auto = false } = {}) {
         toggleUserOverlay(false);
         resetUserScopedState();
         await ensureFxRates(BASE_CURRENCY);
+        if (typeof hydrateRetencionDividendos === 'function') await hydrateRetencionDividendos();
         switchingUser = false;
         await loadTab('inicio');
     } catch (err) {

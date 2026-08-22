@@ -174,7 +174,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     presupuestosDelete: (id) => ipcRenderer.invoke('presupuestos-delete', id),
 
     // ============= BACKUP =============
-    backupDownload: () => ipcRenderer.invoke('backup-download')
+    backupDownload: () => ipcRenderer.invoke('backup-download'),
+
+    // ============= AJUSTES =============
+    getAppSetting: (key) => ipcRenderer.invoke('get-app-setting', key),
+    setAppSetting: (key, value) => ipcRenderer.invoke('set-app-setting', { key, value })
 });
 
 console.log('✅ Preload script cargado - API expuesta');

@@ -239,6 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
         gestorIdiomas.cambiarIdioma(idiomaGuardado);
     }
     setCurrency(monedaGuardada, { silent: true });
+    if (typeof hydrateRetencionDividendos === 'function') hydrateRetencionDividendos();
 
     initTabAccessibility();
     initKeyboardNavigation();

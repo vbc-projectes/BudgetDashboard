@@ -56,7 +56,15 @@ class TransactionManager {
     }
 
     // ===== CARGAR CATEGORÍAS =====
+    // Cacheada unos segundos: editRow() la llama en cada clic de "editar", y las
+    // categorías casi nunca cambian entre ediciones — evita un fetch + reconstrucción
+    // completa de todos los <select> del tab por cada fila que se edita.
     async loadCategories() {
+        const now = Date.now();
+        if (this._categoriesCache && (now - (this._categoriesCacheTime || 0)) < 30000) {
+            return this._categoriesCache;
+        }
+
         const res = await fetch('/categorias');
         const data = await res.json();
         const categories = data[this.categoryType] || [];
@@ -64,7 +72,7 @@ class TransactionManager {
         Object.values(this.selects).forEach(selector => {
             const select = document.querySelector(selector);
             if (!select) return;
-            
+
             select.innerHTML = '';
             categories.forEach(cat => {
                 const opt = document.createElement('option');
@@ -74,6 +82,8 @@ class TransactionManager {
             });
         });
 
+        this._categoriesCache = categories;
+        this._categoriesCacheTime = now;
         return categories;
     }
 
@@ -244,7 +254,7 @@ class TransactionManager {
     attachRowEvents(tbody, type) {
         // Eliminar
         tbody.querySelectorAll('.delBtn').forEach(btn => {
-            btn.onclick = () => this.deleteItem(btn.dataset.id, type);
+            btn.onclick = () => this.deleteItem(btn.dataset.id, type, btn.closest('tr'));
         });
 
         // Editar
@@ -254,7 +264,7 @@ class TransactionManager {
     }
 
     // ===== ELIMINAR =====
-    async deleteItem(id, type) {
+    async deleteItem(id, type, tr = null) {
         const confirmed = await showConfirm(this.t('formularios.confirmarEliminar', '¿Eliminar este elemento?'));
         if (!confirmed) return;
 
@@ -268,7 +278,9 @@ class TransactionManager {
 
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-            await this.loadData();
+            // Quitar solo la fila afectada en vez de recargar y reconstruir las 3
+            // tablas completas (hasta miles de filas) por cada borrado.
+            if (tr) tr.remove(); else await this.loadData();
             if (typeof cargarResumenPeriodos === 'function') cargarResumenPeriodos();
             if (typeof notifySuccess === 'function') {
                 notifySuccess(this.t('mensajes.elementoEliminado', 'Elemento eliminado'));
@@ -286,6 +298,7 @@ class TransactionManager {
         const id = tr.dataset.id;
         const cells = tr.querySelectorAll('td.editable');
         const originalData = {};
+        const originalHtml = {};
         const categories = await this.loadCategories();
 
         // Guardar datos originales y convertir a inputs
@@ -293,6 +306,7 @@ class TransactionManager {
             const field = cell.dataset.field;
             const rawVal = cell.dataset.value !== undefined ? cell.dataset.value : cell.textContent.trim();
             originalData[field] = rawVal;
+            originalHtml[field] = cell.innerHTML;
 
             const input = this.createEditInput(field, rawVal, categories);
             cell.innerHTML = '';
@@ -301,6 +315,7 @@ class TransactionManager {
 
         // Cambiar botones a Guardar/Cancelar
         const actionsCell = tr.querySelector('td:last-child');
+        const originalActionsHtml = actionsCell.innerHTML;
         const saveTitle = this.t('formularios.guardar', 'Guardar');
         const cancelTitle = this.t('formularios.cancelar', 'Cancelar');
         
@@ -378,9 +393,14 @@ class TransactionManager {
             }
         };
 
-        // Evento cancelar
-        actionsCell.querySelector('.cancelBtn').onclick = async () => {
-            await this.loadData();
+        // Evento cancelar: restaura el contenido original de la fila sin recargar
+        // ni reconstruir toda la tabla — no se ha cambiado ningún dato.
+        actionsCell.querySelector('.cancelBtn').onclick = () => {
+            cells.forEach(cell => {
+                cell.innerHTML = originalHtml[cell.dataset.field];
+            });
+            actionsCell.innerHTML = originalActionsHtml;
+            this.attachRowEvents(tr.parentElement, type);
         };
     }
 

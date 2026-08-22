@@ -152,7 +152,6 @@ TRADUCCIONES.en = {
             // ===== SETTINGS =====
             ajustes: {
                 titulo: 'Settings',
-                descripcion: 'Configure theme, language and working currency',
                 usuarioActivo: 'Active user',
                 cambiarUsuarioSidebar: 'You can switch users from the profile selector.',
                 retencionDividendos: 'Dividend retention (%):',

@@ -17,6 +17,8 @@ function securityMiddleware(req, res, next) {
         `style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; ` +
         `font-src 'self' https://cdnjs.cloudflare.com; ` +
         `img-src 'self' data:; ` +
+        `manifest-src 'self'; ` +
+        `worker-src 'self'; ` +
         `connect-src 'self' ${wsScheme} https://cdn.jsdelivr.net https://api.exchangerate-api.com https://open.er-api.com https://query1.finance.yahoo.com`
     );
     
@@ -31,7 +33,18 @@ function securityMiddleware(req, res, next) {
  * Middleware de timeout
  */
 function timeoutMiddleware(req, res, next) {
+    // Rutas que dependen de proveedores externos lentos (Yahoo Finance con varios
+    // sufijos de ticker candidatos) pueden seguir trabajando después de que este
+    // timeout ya haya respondido. Sin este guard, esa respuesta tardía lanza
+    // ERR_HTTP_HEADERS_SENT (visible en logs como ruido constante) en vez de
+    // simplemente descartarse — la conexión al cliente ya se cerró de todos modos.
+    const originalJson = res.json.bind(res);
+    res.json = (body) => (res.headersSent ? res : originalJson(body));
+    const originalSend = res.send.bind(res);
+    res.send = (body) => (res.headersSent ? res : originalSend(body));
+
     res.setTimeout(config.REQUEST_TIMEOUT, () => {
+        if (res.headersSent) return;
         res.status(408).json({ error: 'Request timeout' });
     });
     next();

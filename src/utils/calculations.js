@@ -143,14 +143,24 @@ function generarArrayMeses(desde, hasta, initialValue = { total: 0 }) {
     return meses;
 }
 
+// Memoiza el parseo de fechas: fechaBase/fechaObjetivo se repiten muchas veces
+// (una vez por cada combinación fila×mes en los bucles de agregación del dashboard),
+// así que cachear evita re-parsear y re-asignar Date para el mismo string una y otra vez.
+const _ipcDateCache = new Map();
 function parseIpcDate(value) {
     if (!value) return null;
     if (value instanceof Date) return value;
-    if (/^\d{4}-\d{2}$/.test(value)) {
-        const [y, m] = value.split('-').map(Number);
-        return new Date(y, m - 1, 1);
+    let d = _ipcDateCache.get(value);
+    if (d === undefined) {
+        if (/^\d{4}-\d{2}$/.test(value)) {
+            const [y, m] = value.split('-').map(Number);
+            d = new Date(y, m - 1, 1);
+        } else {
+            d = new Date(value);
+        }
+        _ipcDateCache.set(value, d);
     }
-    return new Date(value);
+    return d;
 }
 
 function contarAniosCompletos(desdeDate, hastaDate) {
@@ -159,9 +169,13 @@ function contarAniosCompletos(desdeDate, hastaDate) {
     }
     if (hastaDate < desdeDate) return 0;
     let years = hastaDate.getFullYear() - desdeDate.getFullYear();
-    const anniversary = new Date(desdeDate.getTime());
-    anniversary.setFullYear(desdeDate.getFullYear() + years);
-    if (anniversary > hastaDate) years -= 1;
+    // Equivalente a construir el aniversario (desdeDate + years) y compararlo con
+    // hastaDate, pero sin asignar un Date nuevo en cada llamada.
+    const desdeMonth = desdeDate.getMonth(), desdeDay = desdeDate.getDate();
+    const hastaMonth = hastaDate.getMonth(), hastaDay = hastaDate.getDate();
+    if (hastaMonth < desdeMonth || (hastaMonth === desdeMonth && hastaDay < desdeDay)) {
+        years -= 1;
+    }
     return Math.max(0, years);
 }
 
@@ -184,10 +198,24 @@ function calcularMontoIpc(monto, ipcPorcentaje, fechaBase, fechaObjetivo) {
  * @param {number} frecuenciaMeses - Frecuencia de pago en meses (1=mensual, 3=trimestral, 6=semestral, 12=anual)
  * @returns {boolean}
  */
+// mes/registroDesde/registroHasta se repiten muchísimas veces en los bucles
+// fila×mes de agregarMensualesPorMes — cachear el parseo de "YYYY-MM-28" evita
+// reasignar los mismos Date una y otra vez.
+const _dia28Cache = new Map();
+function _parseDia28(yyyyMm) {
+    let d = _dia28Cache.get(yyyyMm);
+    if (d === undefined) {
+        d = new Date(yyyyMm + "-28");
+        _dia28Cache.set(yyyyMm, d);
+    }
+    return d;
+}
+const _SIN_FECHA_FIN = new Date(9999, 11, 31);
+
 function esMensualActivo(mes, hastaDate, registroDesde, registroHasta, frecuenciaMeses = 1) {
-    const mes28 = new Date(mes + "-28");
-    const inicio28 = new Date(registroDesde + "-28");
-    const fin28 = registroHasta ? new Date(registroHasta + "-28") : new Date(9999, 11, 31);
+    const mes28 = _parseDia28(mes);
+    const inicio28 = _parseDia28(registroDesde);
+    const fin28 = registroHasta ? _parseDia28(registroHasta) : _SIN_FECHA_FIN;
 
     if (mes28 < inicio28 || mes28 > fin28 || mes28 > hastaDate) return false;
 
@@ -221,10 +249,11 @@ function calcularImpuestosDesdeRruto(registros) {
  * @param {string} campo - Campo donde guardar el resultado (default: 'impuestos')
  */
 function agregarImpuestosPuntualesPorMes(ingresos, mesesObj, campo = 'impuestos') {
+    const porMes = new Map(mesesObj.map(m => [m.mes, m]));
     ingresos.forEach(i => {
         if (i.bruto && i.bruto !== i.monto) {
             const mes = i.fecha.slice(0, 7);
-            const mesData = mesesObj.find(m => m.mes === mes);
+            const mesData = porMes.get(mes);
             if (mesData) {
                 mesData[campo] = (mesData[campo] || 0) + (i.bruto - i.monto);
             }
@@ -258,9 +287,10 @@ function agregarImpuestosMensualesPorMes(ingresos, meses, hastaDate, campo = 'im
  * @param {string} campo - Campo donde sumar (default: 'total')
  */
 function agregarPuntualesPorMes(transacciones, meses, campo = 'total') {
+    const porMes = new Map(meses.map(m => [m.mes, m]));
     transacciones.forEach(t => {
         const mes = t.fecha.slice(0, 7);
-        const mesData = meses.find(m => m.mes === mes);
+        const mesData = porMes.get(mes);
         if (mesData) {
             mesData[campo] = (mesData[campo] || 0) + t.monto;
         }

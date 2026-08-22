@@ -2,14 +2,49 @@ function initGastosCalendar() {
     let calYear = new Date().getFullYear();
     let calMonth = new Date().getMonth() + 1;
     let calData = null;
+    // Índice de gastos puntuales por mes ("YYYY-MM") y lista de próximos gastos,
+    // recalculados solo cuando llegan datos nuevos — no en cada clic de mes
+    // siguiente/anterior, que antes reescaneaba el array completo cada vez.
+    let puntualesByMonth = new Map();
+    let proximosData = null;
 
     async function loadCalData() {
         try {
             const res = await fetch('/dashboard');
             if (!res.ok) return;
             calData = await res.json();
+            puntualesByMonth = indexPuntualesByMonth(calData.gastos_puntuales || []);
+            proximosData = computeProximos();
             renderCalendar();
         } catch (_) {}
+    }
+
+    function indexPuntualesByMonth(puntuales) {
+        const map = new Map();
+        for (const g of puntuales) {
+            if (!g.fecha) continue;
+            const mes = g.fecha.slice(0, 7);
+            if (!map.has(mes)) map.set(mes, []);
+            map.get(mes).push(g);
+        }
+        return map;
+    }
+
+    function computeProximos() {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const limitDate = new Date(today);
+        limitDate.setMonth(limitDate.getMonth() + 3);
+
+        const upcoming = (calData.gastos_puntuales || [])
+            .filter(g => {
+                const d = new Date(g.fecha + 'T00:00:00');
+                return d >= today && d <= limitDate;
+            })
+            .map(g => ({ ...g, _date: new Date(g.fecha + 'T00:00:00') }))
+            .sort((a, b) => a._date - b._date);
+
+        return { today, upcoming, total: upcoming.reduce((s, g) => s + (g.monto || 0), 0) };
     }
 
     // Simplified IPC adjustment for frontend display (full calculation is backend-side)
@@ -43,9 +78,7 @@ function initGastosCalendar() {
         if (!calData) return { puntuales: [], mensuales: [], totalP: 0, totalM: 0, total: 0 };
         const mesStr = `${year}-${String(month).padStart(2, '0')}`;
 
-        const puntuales = (calData.gastos_puntuales || []).filter(g =>
-            g.fecha && g.fecha.startsWith(mesStr + '-')
-        );
+        const puntuales = puntualesByMonth.get(mesStr) || [];
 
         const mensuales = (calData.gastos_mensuales || [])
             .filter(g => esMensualActivoFront(mesStr, g.desde, g.hasta, g.frecuencia_meses || 1))
@@ -186,22 +219,9 @@ function initGastosCalendar() {
 
     function renderProximos() {
         const container = document.getElementById('gastoCalProximos');
-        if (!container || !calData) return;
+        if (!container || !calData || !proximosData) return;
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const limitDate = new Date(today);
-        limitDate.setMonth(limitDate.getMonth() + 3);
-
-        const upcoming = (calData.gastos_puntuales || [])
-            .filter(g => {
-                const d = new Date(g.fecha + 'T00:00:00');
-                return d >= today && d <= limitDate;
-            })
-            .map(g => ({ ...g, _date: new Date(g.fecha + 'T00:00:00') }))
-            .sort((a, b) => a._date - b._date);
-
-        const totalProximos = upcoming.reduce((s, g) => s + (g.monto || 0), 0);
+        const { today, upcoming, total: totalProximos } = proximosData;
 
         const headerHtml = `
             <div class="gcal-proximos-header">

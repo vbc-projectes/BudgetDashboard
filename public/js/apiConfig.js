@@ -292,6 +292,12 @@ window.API = {
         if (method === 'DELETE' && (m = basePath.match(/^\/presupuestos\/(\d+)$/)))
             return api.presupuestosDelete(Number(m[1]));
 
+        // Ajustes clave-valor
+        if (method === 'GET'  && (m = basePath.match(/^\/settings\/(.+)$/)))
+            return api.getAppSetting(decodeURIComponent(m[1]));
+        if (method === 'POST' && (m = basePath.match(/^\/settings\/(.+)$/)))
+            return api.setAppSetting(decodeURIComponent(m[1]), body?.value);
+
         throw new Error(`Ruta no implementada: ${method} ${url}`);
     }
 };

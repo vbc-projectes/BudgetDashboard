@@ -64,6 +64,7 @@ class BolsaService {
                 }).catch(() => {});
             }
         }
+        CuentaRemuneradaService.invalidateCache();
     }
 
     async updateOperacion(data) {
@@ -101,11 +102,13 @@ class BolsaService {
                 }
             }).catch(() => {});
         }
+        CuentaRemuneradaService.invalidateCache();
     }
 
     async deleteOperacion(id) {
         if (!id) throw new Error('ID es requerido');
         await dbRun(db, `DELETE FROM operaciones_bolsa WHERE id = ?`, [id]);
+        CuentaRemuneradaService.invalidateCache();
     }
 
     // ── Dividendos ─────────────────────────────────────────────────────
@@ -133,6 +136,7 @@ class BolsaService {
                 notas || null
             ]
         );
+        CuentaRemuneradaService.invalidateCache();
     }
 
     async updateDividendo(data) {
@@ -142,11 +146,13 @@ class BolsaService {
             `UPDATE dividendos SET ticker=?, empresa=?, fecha=?, importe_bruto=?, retencion=?, notas=? WHERE id=?`,
             [ticker.trim().toUpperCase(), empresa || null, fecha, parseFloat(importe_bruto), parseFloat(retencion) || 0, notas || null, id]
         );
+        CuentaRemuneradaService.invalidateCache();
     }
 
     async deleteDividendo(id) {
         if (!id) throw new Error('ID es requerido');
         await dbRun(db, `DELETE FROM dividendos WHERE id = ?`, [id]);
+        CuentaRemuneradaService.invalidateCache();
     }
 
     // ── Posiciones (cartera actual) ────────────────────────────────────
@@ -422,13 +428,24 @@ class BolsaService {
     async cacheTickerHistory(ticker, rows) {
         const norm = String(ticker || '').trim().toUpperCase();
         if (!norm || !Array.isArray(rows) || rows.length === 0) return;
-        for (const row of rows) {
-            if (!row.date || row.price == null) continue;
-            await dbRun(db,
-                `INSERT OR REPLACE INTO ticker_history (ticker, fecha, precio_cierre, updated_at)
-                 VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
-                [norm, row.date, parseFloat(row.price)]
-            );
+        const validRows = rows.filter(row => row.date && row.price != null);
+        if (validRows.length === 0) return;
+
+        // Envolver en una única transacción: evita cientos de commits individuales
+        // (uno por fila) en el camino síncrono que el usuario está esperando.
+        await dbRun(db, 'BEGIN TRANSACTION');
+        try {
+            for (const row of validRows) {
+                await dbRun(db,
+                    `INSERT OR REPLACE INTO ticker_history (ticker, fecha, precio_cierre, updated_at)
+                     VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
+                    [norm, row.date, parseFloat(row.price)]
+                );
+            }
+            await dbRun(db, 'COMMIT');
+        } catch (err) {
+            await dbRun(db, 'ROLLBACK').catch(() => {});
+            throw err;
         }
     }
 
@@ -487,6 +504,19 @@ class BolsaService {
     }
 
     /**
+     * Igual que getSharesHeldAtDate pero calculado en memoria a partir de una lista
+     * de operaciones ya cargada — evita una query SQL por evento de dividendo.
+     */
+    static _sharesHeldFromOps(ops, date) {
+        let held = 0;
+        for (const op of ops) {
+            if (op.fecha > date) continue;
+            held += op.tipo === 'compra' ? parseFloat(op.cantidad) : -parseFloat(op.cantidad);
+        }
+        return held > 0.0001 ? held : 0;
+    }
+
+    /**
      * Sync dividends from Yahoo Finance for ALL tickers that ever had a compra.
      * Re-calculates shares held at each ex-dividend date and upserts existing auto
      * records (so changing operations retroactively updates dividend amounts).
@@ -504,19 +534,19 @@ class BolsaService {
         const processedResolvedTickers = new Set();
 
         for (const { ticker } of allTickers) {
-            // Earliest buy date for this ticker
-            const firstBuy = await dbGet(db,
-                `SELECT MIN(fecha) AS first_date FROM operaciones_bolsa WHERE ticker = ? AND tipo = 'compra'`,
+            // Todas las operaciones de este ticker en una única consulta — se reutiliza
+            // para first-buy date, empresa y el cálculo de acciones en tenencia por evento
+            // (antes: 1 query extra por evento de dividendo vía getSharesHeldAtDate).
+            const tickerOps = await dbAll(db,
+                `SELECT fecha, tipo, cantidad, empresa FROM operaciones_bolsa WHERE ticker = ? ORDER BY fecha ASC`,
                 [ticker]
             );
-            const since = firstBuy?.first_date ? new Date(firstBuy.first_date) : new Date('2000-01-01');
 
-            // Best empresa name from latest operation
-            const latestOp = await dbGet(db,
-                `SELECT empresa FROM operaciones_bolsa WHERE ticker = ? AND empresa IS NOT NULL ORDER BY fecha DESC LIMIT 1`,
-                [ticker]
-            );
-            const empresa = latestOp?.empresa || ticker;
+            const compras = tickerOps.filter(o => o.tipo === 'compra');
+            const since = compras.length > 0 ? new Date(compras[0].fecha) : new Date('2000-01-01');
+
+            const latestConEmpresa = [...tickerOps].reverse().find(o => o.empresa);
+            const empresa = latestConEmpresa?.empresa || ticker;
 
             let result;
             try {
@@ -533,7 +563,7 @@ class BolsaService {
 
             let added = 0, updated = 0, skipped = 0;
             for (const ev of events) {
-                const sharesHeld = await this.getSharesHeldAtDate(ticker, ev.date);
+                const sharesHeld = BolsaService._sharesHeldFromOps(tickerOps, ev.date);
                 if (sharesHeld <= 0) { skipped++; continue; }
 
                 if (alreadyProcessed) {
@@ -586,6 +616,7 @@ class BolsaService {
             totalAdded   += added;
             totalUpdated += updated;
         }
+        if (totalAdded > 0 || totalUpdated > 0) CuentaRemuneradaService.invalidateCache();
         return { stats, totalAdded, totalUpdated };
     }
 

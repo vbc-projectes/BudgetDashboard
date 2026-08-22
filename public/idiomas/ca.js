@@ -152,7 +152,6 @@ TRADUCCIONES.ca = {
             // ===== AJUSTOS =====
             ajustes: {
                 titulo: 'Ajustos',
-                descripcion: 'Configura tema, idioma i moneda de treball',
                 usuarioActivo: 'Usuari actiu',
                 cambiarUsuarioSidebar: 'Pots canviar d\'usuari des del selector de perfils.',
                 retencionDividendos: 'Retenció dividends (%):',

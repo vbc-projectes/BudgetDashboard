@@ -1,6 +1,13 @@
 // fetch nativo en Node.js 18+ (no necesita polyfill)
 const YahooFinance = require('yahoo-finance2').default;
-const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
+// validation.logErrors: false — el código prueba varios sufijos de ticker por
+// candidato (buildTickerCandidates/EXCHANGE_SUFFIXES) y descarta los que fallan
+// (try/catch); son fallos esperados, no errores reales, así que no hace falta
+// que la librería vuelque el informe de validación completo a consola por cada uno.
+const yahooFinance = new YahooFinance({
+    suppressNotices: ['yahooSurvey'],
+    validation: { logErrors: false, logOptionsErrors: false }
+});
 const logger = require('../utils/logger');
 
 // Caché de tasa de cambio USD->EUR (se actualiza cada hora)
@@ -17,6 +24,9 @@ const historicalCache = new Map();
 const metadataCache = new Map();
 // Deduplicación de peticiones históricas en vuelo (evita llamadas paralelas duplicadas al mismo ticker)
 const historicalInFlight = new Map();
+// Igual que historicalInFlight pero para getAssetPrice (evita fetches duplicados cuando
+// varios paneles piden el precio del mismo ticker no cacheado al mismo tiempo)
+const priceInFlight = new Map();
 
 // Control de ruido de logs para tickers inválidos/no disponibles
 const failedTickerLogCache = new Map();
@@ -576,6 +586,20 @@ async function getAssetPrice(ticker) {
         return addCacheMetadata(freshCache.value, freshCache, 'cache-hit');
     }
 
+    if (priceInFlight.has(priceCacheKey)) {
+        return priceInFlight.get(priceCacheKey);
+    }
+
+    const promise = _doFetchAssetPrice(normalizedTicker, priceCacheKey);
+    priceInFlight.set(priceCacheKey, promise);
+    try {
+        return await promise;
+    } finally {
+        priceInFlight.delete(priceCacheKey);
+    }
+}
+
+async function _doFetchAssetPrice(normalizedTicker, priceCacheKey) {
     const resolved = await quoteFirstAvailablePrice(normalizedTicker);
     if (!resolved) {
         const staleCache = getAnyCacheEntry(priceCache, priceCacheKey);

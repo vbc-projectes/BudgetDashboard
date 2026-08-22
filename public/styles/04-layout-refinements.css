@@ -683,26 +683,9 @@ main {
     max-width: 980px;
 }
 
-.ajustes-header {
-    margin-bottom: var(--spacing-2xl);
-}
-
-.ajustes-header h2 {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    color: var(--dark);
-    font-size: 1.8rem;
-    margin-bottom: var(--spacing-xs);
-}
-
-.ajustes-header p {
-    color: var(--text-secondary);
-}
-
 .ajustes-grid {
     display: grid;
-    gap: var(--spacing-xl);
+    gap: var(--spacing-2xl);
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 

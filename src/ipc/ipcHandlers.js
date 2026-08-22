@@ -567,6 +567,7 @@ function registerIpcHandlers() {
             INSERT INTO cuenta_remunerada (descripcion, monto, aportacion_mensual, interes, retencion, interes_generado, categoria_id, desde, hasta, linked_to_bolsa)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [descripcionFinal, monto, aportacion_mensual || null, interes || null, retencion || 0, interesGenerado, categoria_id, desde, hasta || null, linkedVal]);
+        CuentaRemuneradaService.invalidateCache();
         return { success: true };
     });
 
@@ -611,6 +612,7 @@ function registerIpcHandlers() {
             WHERE id = ?
         `, [descripcionFinal, desde, hasta, monto, aportacion_mensual || null, interes || null, retencion !== undefined ? (parseFloat(retencion) || 0) : 0, interesGenerado, catId, ...linkedParam, id]);
 
+        CuentaRemuneradaService.invalidateCache();
         return { success: true };
     });
 
@@ -620,6 +622,7 @@ function registerIpcHandlers() {
             throw new Error('ID es requerido');
         }
         await dbRun(db, "DELETE FROM cuenta_remunerada WHERE id = ?", [id]);
+        CuentaRemuneradaService.invalidateCache();
         return { success: true };
     });
 
@@ -632,6 +635,7 @@ function registerIpcHandlers() {
             await dbRun(db, 'UPDATE cuenta_remunerada SET linked_to_bolsa = 1 WHERE id = ?', [id]);
         }
         await dbRun(db, 'COMMIT');
+        CuentaRemuneradaService.invalidateCache();
         return { success: true };
     });
 
@@ -648,10 +652,12 @@ function registerIpcHandlers() {
     safeHandle('cr-add-aportacion', async (event, data) => {
         const { id, desde, cantidad } = data;
         await dbRun(db, `INSERT INTO cuenta_remunerada_aportaciones (cuenta_id, desde, cantidad) VALUES (?, ?, ?)`, [id, desde, cantidad]);
+        CuentaRemuneradaService.invalidateCache();
         return { success: true };
     });
     safeHandle('cr-delete-aportacion', async (event, data) => {
         await dbRun(db, `DELETE FROM cuenta_remunerada_aportaciones WHERE id = ?`, [data.id]);
+        CuentaRemuneradaService.invalidateCache();
         return { success: true };
     });
 
@@ -662,10 +668,12 @@ function registerIpcHandlers() {
     safeHandle('cr-add-ajuste', async (event, data) => {
         const { id, fecha, saldo, descripcion } = data;
         await dbRun(db, `INSERT INTO cuenta_remunerada_ajustes (cuenta_id, fecha, saldo, descripcion) VALUES (?, ?, ?, ?)`, [id, fecha, saldo, descripcion || null]);
+        CuentaRemuneradaService.invalidateCache();
         return { success: true };
     });
     safeHandle('cr-delete-ajuste', async (event, data) => {
         await dbRun(db, `DELETE FROM cuenta_remunerada_ajustes WHERE id = ?`, [data.id]);
+        CuentaRemuneradaService.invalidateCache();
         return { success: true };
     });
 
@@ -676,10 +684,12 @@ function registerIpcHandlers() {
     safeHandle('cr-add-tipo-interes', async (event, data) => {
         const { id, desde, interes } = data;
         await dbRun(db, `INSERT INTO historial_tipos_interes (cuenta_remunerada_id, desde, interes) VALUES (?, ?, ?)`, [id, desde, interes]);
+        CuentaRemuneradaService.invalidateCache();
         return { success: true };
     });
     safeHandle('cr-delete-tipo-interes', async (event, data) => {
         await dbRun(db, `DELETE FROM historial_tipos_interes WHERE id = ?`, [data.id]);
+        CuentaRemuneradaService.invalidateCache();
         return { success: true };
     });
     safeHandle('cr-informe-fiscal', async () => {
@@ -1141,6 +1151,23 @@ function registerIpcHandlers() {
         if (canceled || !destPath) return { success: false, canceled: true };
         fsExtra.copyFileSync(dbPath, destPath);
         return { success: true, path: destPath };
+    });
+
+    // ============= AJUSTES (clave-valor por usuario) =============
+
+    safeHandle('get-app-setting', async (event, key) => {
+        const row = await dbGet(db, `SELECT value FROM app_settings WHERE key = ?`, [key]);
+        return { key, value: row ? row.value : null };
+    });
+
+    safeHandle('set-app-setting', async (event, { key, value }) => {
+        if (value === undefined) throw new Error('value es requerido');
+        await dbRun(db,
+            `INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+            [key, String(value)]
+        );
+        return { success: true };
     });
 
     logger.info('IPC handlers registered');

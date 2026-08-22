@@ -703,6 +703,25 @@ function initInicio() {
     renderInicioInsights();
 }
 
+/**
+ * Sincroniza localStorage.retencionDividendos con el valor guardado en el backend
+ * (tabla app_settings del usuario activo). Se llama al arrancar la app, al cambiar
+ * de usuario y al abrir la pestaña Ajustes, para que el valor mostrado/usado en
+ * cálculos no dependa únicamente de lo que quedó en el localStorage del navegador.
+ */
+async function hydrateRetencionDividendos(inputEl = null) {
+    try {
+        const res = await fetch('/settings/retencionDividendos');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data && data.value !== null && data.value !== undefined) {
+            localStorage.setItem('retencionDividendos', data.value);
+            const el = inputEl || document.getElementById('retencionDividendosInput');
+            if (el) el.value = parseFloat(data.value);
+        }
+    } catch (_) {}
+}
+
 function initAjustes() {
     setUserLabel(activeUser);
 
@@ -733,11 +752,22 @@ function initAjustes() {
 
     const retencionInput = document.getElementById('retencionDividendosInput');
     if (retencionInput && !retencionInput.dataset.listenerAdded) {
+        // Fuente de verdad: backend (tabla app_settings, por usuario). localStorage
+        // se mantiene como caché espejo para los sitios que la leen de forma
+        // síncrona (periodos-resumen.js, hucha.core.js, inversiones.js).
         retencionInput.value = parseFloat(localStorage.getItem('retencionDividendos') || '0');
-        retencionInput.addEventListener('change', (e) => {
+        hydrateRetencionDividendos(retencionInput);
+        retencionInput.addEventListener('change', async (e) => {
             const val = Math.max(0, Math.min(100, parseFloat(e.target.value) || 0));
             e.target.value = val;
             localStorage.setItem('retencionDividendos', val);
+            try {
+                await fetch('/settings/retencionDividendos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ value: val })
+                });
+            } catch (_) {}
         });
         retencionInput.dataset.listenerAdded = 'true';
     }

@@ -237,6 +237,7 @@ async function getAhorrosMes(desde, hasta, categoria_id = null) {
         gastos_bolsa: 0,
         ahorros: 0
     });
+    const mesesPorNombre = new Map(meses.map(m => [m.mes, m]));
 
     // Ingresos
     const ingresosP = await ingresosPuntualesService.getByMonth(desde, hasta, categoria_id);
@@ -291,7 +292,7 @@ async function getAhorrosMes(desde, hasta, categoria_id = null) {
     );
     dividendosBolsa.forEach(div => {
         const mes = (div.fecha || '').slice(0, 7);
-        const mesData = meses.find(m => m.mes === mes);
+        const mesData = mesesPorNombre.get(mes);
         if (!mesData) return;
         const bruto = parseFloat(div.importe_bruto) || 0;
         const ret   = parseFloat(div.retencion)     || 0;
@@ -310,7 +311,7 @@ async function getAhorrosMes(desde, hasta, categoria_id = null) {
         );
         opsBolsa.forEach(op => {
             const mes = (op.fecha || '').slice(0, 7);
-            const mesData = meses.find(m => m.mes === mes);
+            const mesData = mesesPorNombre.get(mes);
             if (!mesData) return;
             const importe = parseFloat(op.cantidad) * parseFloat(op.precio_unitario);
             const comision = parseFloat(op.comision || 0);
@@ -416,6 +417,7 @@ async function getAhorrosMesReal(desde, hasta, categoria_id = null) {
         gastos_bolsa: 0,
         ahorros: 0
     });
+    const mesesPorNombreR = new Map(meses.map(m => [m.mes, m]));
 
     const ingresosP = await ingresosRealesService.getByMonth(desde, hasta, categoria_id);
     agregarPuntualesPorMes(ingresosP, meses, 'ingresos');
@@ -447,7 +449,7 @@ async function getAhorrosMesReal(desde, hasta, categoria_id = null) {
     );
     divsR.forEach(div => {
         const mes = (div.fecha || '').slice(0, 7);
-        const md  = meses.find(m => m.mes === mes);
+        const md  = mesesPorNombreR.get(mes);
         if (!md) return;
         const bruto = parseFloat(div.importe_bruto) || 0;
         const ret   = parseFloat(div.retencion)     || 0;
@@ -465,7 +467,7 @@ async function getAhorrosMesReal(desde, hasta, categoria_id = null) {
         );
         opsR.forEach(op => {
             const mes = (op.fecha || '').slice(0, 7);
-            const md  = meses.find(m => m.mes === mes);
+            const md  = mesesPorNombreR.get(mes);
             if (!md) return;
             const imp = parseFloat(op.cantidad) * parseFloat(op.precio_unitario);
             const com = parseFloat(op.comision || 0);
@@ -1132,20 +1134,46 @@ async function getAnomalias(meses = 6) {
     return anomalias.sort((a, b) => b.desviacion_pct - a.desviacion_pct);
 }
 
+// ── Caché de agregaciones pesadas ───────────────────────────────────────────
+// Mismo patrón que getResumenPeriodos: TTL corto, sin invalidación activa en
+// escritura (el coste de servir datos con hasta 60s de antigüedad tras una
+// edición ya es el comportamiento aceptado en producción para resumen-periodos).
+// Evita recalcular desde cero — incluyendo la simulación día-a-día de la CR —
+// en cada llamada cuando el home dispara varias peticiones seguidas.
+const _aggCache = new Map();
+const AGG_CACHE_TTL_MS = 60000;
+
+function _aggDbKey() {
+    return typeof db.__getDbPath === 'function' ? db.__getDbPath() : 'default';
+}
+
+function withAggCache(name, fn) {
+    return async (...args) => {
+        const key = `${_aggDbKey()}|${name}|${JSON.stringify(args)}`;
+        const cached = _aggCache.get(key);
+        const now = Date.now();
+        if (cached && (now - cached.time) < AGG_CACHE_TTL_MS) return cached.data;
+        const data = await fn(...args);
+        if (_aggCache.size > 200) _aggCache.clear();
+        _aggCache.set(key, { time: now, data });
+        return data;
+    };
+}
+
 module.exports = {
     getDashboardData,
     getDashboardRealData,
     getDashboardRangoFechas,
     getImpuestosMes,
     getImpuestosMesReal,
-    getAhorrosMes,
-    getAhorrosMesReal,
-    getCategoriasPeriodo,
-    getCategoriasPeriodoReal,
-    getGastosCategoriaMes,
-    getGastosCategoriaMesReal,
+    getAhorrosMes: withAggCache('getAhorrosMes', getAhorrosMes),
+    getAhorrosMesReal: withAggCache('getAhorrosMesReal', getAhorrosMesReal),
+    getCategoriasPeriodo: withAggCache('getCategoriasPeriodo', getCategoriasPeriodo),
+    getCategoriasPeriodoReal: withAggCache('getCategoriasPeriodoReal', getCategoriasPeriodoReal),
+    getGastosCategoriaMes: withAggCache('getGastosCategoriaMes', getGastosCategoriaMes),
+    getGastosCategoriaMesReal: withAggCache('getGastosCategoriaMesReal', getGastosCategoriaMesReal),
     getResumenPeriodos,
-    getNetWorth,
-    getPresupuestosConGasto,
-    getAnomalias
+    getNetWorth: withAggCache('getNetWorth', getNetWorth),
+    getPresupuestosConGasto: withAggCache('getPresupuestosConGasto', getPresupuestosConGasto),
+    getAnomalias: withAggCache('getAnomalias', getAnomalias)
 };

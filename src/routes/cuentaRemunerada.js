@@ -35,6 +35,7 @@ router.post('/add/cuenta_remunerada', async (req, res, next) => {
             `INSERT INTO cuenta_remunerada (descripcion, monto, aportacion_mensual, interes, retencion, interes_generado, categoria_id, desde, hasta, linked_to_bolsa) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [descripcionFinal, monto, aportacion_mensual || null, interes || null, retencion || 0, interesGenerado, categoria_id, desde, hasta || null, linkedVal]
         );
+        CuentaRemuneradaService.invalidateCache();
         res.json({ success: true });
     } catch (err) { next(err); }
 });
@@ -72,6 +73,7 @@ router.post('/update/cuenta_remunerada', async (req, res, next) => {
             `UPDATE cuenta_remunerada SET descripcion=?, desde=?, hasta=?, monto=?, aportacion_mensual=?, interes=?, retencion=?, interes_generado=?, categoria_id=?${linkedSet} WHERE id=?`,
             [descripcionFinal, desde, hasta, monto, aportacion_mensual || null, interes || null, parseFloat(retencion) || 0, interesGenerado, catId, ...linkedParam, id]
         );
+        CuentaRemuneradaService.invalidateCache();
         res.json({ success: true });
     } catch (err) { next(err); }
 });
@@ -81,6 +83,7 @@ router.post('/delete/cuenta_remunerada', async (req, res, next) => {
         const { id } = req.body;
         if (!id) return res.status(400).json({ error: 'ID es requerido' });
         await dbRun(db, 'DELETE FROM cuenta_remunerada WHERE id = ?', [id]);
+        CuentaRemuneradaService.invalidateCache();
         res.json({ success: true });
     } catch (err) { next(err); }
 });
@@ -109,6 +112,7 @@ router.post('/cuenta-remunerada/:id/aportaciones', async (req, res, next) => {
         const { desde, cantidad } = req.body;
         if (!desde || cantidad === undefined) return res.status(400).json({ error: 'desde y cantidad son requeridos' });
         await dbRun(db, `INSERT INTO cuenta_remunerada_aportaciones (cuenta_id, desde, cantidad) VALUES (?, ?, ?)`, [req.params.id, desde, cantidad]);
+        CuentaRemuneradaService.invalidateCache();
         res.json({ success: true });
     } catch (err) { next(err); }
 });
@@ -116,6 +120,7 @@ router.post('/cuenta-remunerada/:id/aportaciones', async (req, res, next) => {
 router.delete('/cuenta-remunerada/aportaciones/:aportacionId', async (req, res, next) => {
     try {
         await dbRun(db, `DELETE FROM cuenta_remunerada_aportaciones WHERE id = ?`, [req.params.aportacionId]);
+        CuentaRemuneradaService.invalidateCache();
         res.json({ success: true });
     } catch (err) { next(err); }
 });
@@ -133,6 +138,7 @@ router.post('/cuenta-remunerada/:id/ajustes', async (req, res, next) => {
         const { fecha, saldo, descripcion } = req.body;
         if (!fecha || saldo === undefined) return res.status(400).json({ error: 'fecha y saldo son requeridos' });
         await dbRun(db, `INSERT INTO cuenta_remunerada_ajustes (cuenta_id, fecha, saldo, descripcion) VALUES (?, ?, ?, ?)`, [req.params.id, fecha, saldo, descripcion || null]);
+        CuentaRemuneradaService.invalidateCache();
         res.json({ success: true });
     } catch (err) { next(err); }
 });
@@ -140,6 +146,7 @@ router.post('/cuenta-remunerada/:id/ajustes', async (req, res, next) => {
 router.delete('/cuenta-remunerada/ajustes/:ajusteId', async (req, res, next) => {
     try {
         await dbRun(db, `DELETE FROM cuenta_remunerada_ajustes WHERE id = ?`, [req.params.ajusteId]);
+        CuentaRemuneradaService.invalidateCache();
         res.json({ success: true });
     } catch (err) { next(err); }
 });
@@ -157,6 +164,7 @@ router.post('/cuenta-remunerada/:id/tipos-interes', async (req, res, next) => {
         const { desde, interes } = req.body;
         if (!desde || interes === undefined) return res.status(400).json({ error: 'desde e interes son requeridos' });
         await dbRun(db, `INSERT INTO historial_tipos_interes (cuenta_remunerada_id, desde, interes) VALUES (?, ?, ?)`, [req.params.id, desde, interes]);
+        CuentaRemuneradaService.invalidateCache();
         res.json({ success: true });
     } catch (err) { next(err); }
 });
@@ -164,6 +172,7 @@ router.post('/cuenta-remunerada/:id/tipos-interes', async (req, res, next) => {
 router.delete('/cuenta-remunerada/tipos-interes/:tipoId', async (req, res, next) => {
     try {
         await dbRun(db, `DELETE FROM historial_tipos_interes WHERE id = ?`, [req.params.tipoId]);
+        CuentaRemuneradaService.invalidateCache();
         res.json({ success: true });
     } catch (err) { next(err); }
 });
@@ -188,6 +197,7 @@ router.post('/cuenta_remunerada/set-link', async (req, res, next) => {
             await dbRun(db, 'UPDATE cuenta_remunerada SET linked_to_bolsa = 1 WHERE id = ?', [id]);
         }
         await dbRun(db, 'COMMIT');
+        CuentaRemuneradaService.invalidateCache();
         res.json({ success: true });
     } catch (err) {
         await dbRun(db, 'ROLLBACK').catch(() => {});

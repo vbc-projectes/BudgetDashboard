@@ -151,7 +151,6 @@ TRADUCCIONES.pt =  {
             // ===== CONFIGURAÇÕES =====
             ajustes: {
                 titulo: 'Configurações',
-                descripcion: 'Configure o tema, idioma e moeda de trabalho',
                 usuarioActivo: 'Usuário ativo',
                 cambiarUsuarioSidebar: 'Você pode trocar de usuário pelo seletor de perfis.',
                 retencionDividendos: 'Retenção de dividendos (%):',

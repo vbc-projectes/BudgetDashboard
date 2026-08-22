@@ -151,7 +151,6 @@ TRADUCCIONES.eu = {
             // ===== EZARPENAK =====
             ajustes: {
                 titulo: 'Ezarpenak',
-                descripcion: 'Konfiguratu gaia, hizkuntza eta lan-moneta',
                 usuarioActivo: 'Erabiltzaile aktiboa',
                 cambiarUsuarioSidebar: 'Erabiltzailea alda dezakezu profil-hautatzailean.',
                 retencionDividendos: 'Dibidendu-atxikipena (%):',
