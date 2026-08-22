@@ -538,6 +538,60 @@ function renderInicioProximosGastos(gastosPuntuales, desde, hasta) {
         : '');
 }
 
+// Widget independiente del selector de período: siempre gastos puntuales con
+// fecha >= hoy, sin importar qué período (1 Mes, Próximos 3 meses...) esté
+// activo arriba. Usa la misma lista de gastos_puntuales que ya trae /dashboard.
+function renderInicioProximosGastosFijo(gastosPuntuales) {
+    const listEl  = document.getElementById('inicio-proximos-fijo-list');
+    const totalEl = document.getElementById('inicio-proximos-fijo-total');
+    if (!listEl) return;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const filtered = (gastosPuntuales || [])
+        .filter(g => g.fecha && new Date(g.fecha + 'T00:00:00') >= today)
+        .map(g => ({ ...g, _date: new Date(g.fecha + 'T00:00:00') }))
+        .sort((a, b) => a._date - b._date);
+
+    const MAX_ITEMS = 15;
+    const shown = filtered.slice(0, MAX_ITEMS);
+    const remaining = filtered.length - shown.length;
+    const allTotal = filtered.reduce((s, g) => s + (g.monto || 0), 0);
+    const shownTotal = shown.reduce((s, g) => s + (g.monto || 0), 0);
+
+    if (totalEl) totalEl.textContent = filtered.length > 0 ? formatearEuro(allTotal) : '';
+
+    if (filtered.length === 0) {
+        listEl.innerHTML = `
+            <div class="inicio-prox-empty">
+                <i class="fas fa-check-circle"></i>
+                Sin próximos gastos puntuales
+            </div>`;
+        return;
+    }
+
+    const escH = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    listEl.innerHTML = shown.map(g => {
+        const diffDays = Math.round((g._date - today) / (1000 * 60 * 60 * 24));
+        const dateLabel = g._date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+        const urgency = diffDays <= 3 ? 'urgent' : diffDays <= 7 ? 'soon' : '';
+        const badgeText = diffDays === 0 ? 'Hoy' : diffDays === 1 ? 'Mañana' : `${diffDays}d`;
+
+        return `<div class="gcal-proximo-item ${urgency}">
+            <span class="gcal-proximo-date">${dateLabel}</span>
+            <span class="gcal-proximo-badge ${urgency}">${badgeText}</span>
+            <span class="gcal-proximo-desc">${escH(g.descripcion)}</span>
+            ${g.categoria ? `<span class="gcal-proximo-cat">${escH(g.categoria)}</span>` : ''}
+            <span class="gcal-proximo-amount">${formatearEuro(g.monto)}</span>
+        </div>`;
+    }).join('')
+    + (remaining > 0
+        ? `<div class="inicio-prox-more">y ${remaining} más — ${formatearEuro(allTotal - shownTotal)} adicionales</div>`
+        : '');
+}
+
 async function renderInicioInsights() {
     if (!document.getElementById('inicioCategoriasList')) return;
 
@@ -591,6 +645,7 @@ async function renderInicioInsights() {
     renderInicioCategorias(categoriasData?.gastos || {});
     renderInicioDeltas(ahorrosMesClipped, ahorrosPrevClipped);
     renderInicioProximosGastos(gastosPuntuales, _desdeRange, _hastaRange);
+    renderInicioProximosGastosFijo(gastosPuntuales);
     renderInicioPresupuestos(_desdeRange, _hastaRange);
 }
 
