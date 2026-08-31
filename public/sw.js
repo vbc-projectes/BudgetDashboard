@@ -6,7 +6,7 @@
 // exactly as it does today — this file adds an offline/caching layer,
 // it does not change what any request returns while online.
 
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const CACHE_NAME = `dashboard-shell-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -90,6 +90,39 @@ self.addEventListener('fetch', (event) => {
                 })
                 .catch(() => cached);
             return cached || networkFetch;
+        })
+    );
+});
+
+// ── Push notifications (pagos próximos) ────────────────────────────────
+self.addEventListener('push', (event) => {
+    let payload = { title: 'Dashboard Económico', body: '' };
+    try {
+        if (event.data) payload = { ...payload, ...event.data.json() };
+    } catch (_) {
+        if (event.data) payload.body = event.data.text();
+    }
+
+    event.waitUntil(
+        self.registration.showNotification(payload.title, {
+            body: payload.body,
+            icon: '/icons/icon-192.png',
+            badge: '/icons/icon-192.png',
+            data: { url: payload.url || '/' },
+        })
+    );
+});
+
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    const targetUrl = event.notification.data?.url || '/';
+
+    event.waitUntil(
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientsList) => {
+            for (const client of clientsList) {
+                if ('focus' in client) return client.focus();
+            }
+            if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
         })
     );
 });

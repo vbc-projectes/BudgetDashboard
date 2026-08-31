@@ -43,7 +43,7 @@ const API_PREFIXES = [
     '/api/', '/add/', '/update/', '/delete/', '/import/', '/sell/',
     '/widget/', '/users/', '/dashboard', '/ahorros', '/categorias',
     '/gastos', '/ingresos', '/impuestos', '/presupuestos', '/bolsa',
-    '/cuenta', '/sub_huchas', '/hucha', '/backup', '/assets',
+    '/cuenta', '/sub_huchas', '/hucha', '/backup', '/assets', '/push/',
 ];
 app.get('*', (req, res, next) => {
     if (API_PREFIXES.some(p => req.path.startsWith(p))) return next();
@@ -61,6 +61,7 @@ const {
 } = require('./src/config/userManager');
 const db = require('./src/config/database');
 const logger = require('./src/utils/logger');
+const { startPushNotificationScheduler } = require('./src/services/pushNotificationScheduler');
 
 // ── Start ────────────────────────────────────────────────────────────
 const PORT = config.PORT;
@@ -81,6 +82,8 @@ app.listen(PORT, async () => {
     } catch (err) {
         logger.error('Startup migration failed:', err.message);
     }
+
+    startPushNotificationScheduler();
 });
 
 module.exports = app;

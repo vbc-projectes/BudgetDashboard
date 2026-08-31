@@ -843,6 +843,101 @@ function initAjustes() {
         });
         themeSelect.dataset.listenerAdded = 'true';
     }
+
+    initPushNotificacionesUI();
+}
+
+/**
+ * Notificaciones push de pagos próximos (solo modo web/PWA — en Electron no
+ * hay service worker ni PushManager). En iOS solo funciona si la app está
+ * instalada en la pantalla de inicio (iOS 16.4+); si no, se explica por qué
+ * el interruptor no está disponible en vez de ocultarlo sin más.
+ */
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = atob(base64);
+    return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+}
+
+async function initPushNotificacionesUI() {
+    const section = document.getElementById('ajustes-notificaciones-section');
+    const toggle = document.getElementById('togglePushNotificaciones');
+    const estadoEl = document.getElementById('ajustes-notificaciones-estado');
+    if (!section || !toggle || !estadoEl) return;
+    if (typeof window.electronAPI !== 'undefined') return; // No aplica en la app de escritorio
+    if (toggle.dataset.listenerAdded) return;
+
+    function showEstado(msg) {
+        estadoEl.textContent = msg || '';
+        estadoEl.style.display = msg ? 'block' : 'none';
+    }
+
+    const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+    section.style.display = 'block';
+
+    if (!supported) {
+        const switchLabel = toggle.closest('label');
+        if (switchLabel) switchLabel.style.display = 'none';
+        const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
+        showEstado(isIOS
+            ? 'En iPhone/iPad, primero añade esta app a la pantalla de inicio (compartir → "Añadir a pantalla de inicio") para poder activar las notificaciones.'
+            : 'Tu navegador no admite notificaciones push.');
+        return;
+    }
+
+    toggle.dataset.listenerAdded = 'true';
+
+    try {
+        const reg = await navigator.serviceWorker.ready;
+        const existingSub = await reg.pushManager.getSubscription();
+        toggle.checked = !!existingSub;
+    } catch (_) {}
+
+    toggle.addEventListener('change', async () => {
+        toggle.disabled = true;
+        try {
+            const reg = await navigator.serviceWorker.ready;
+
+            if (toggle.checked) {
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') {
+                    toggle.checked = false;
+                    showEstado('Permiso de notificaciones denegado.');
+                    return;
+                }
+                const keyRes = await fetch('/push/vapid-public-key');
+                const { publicKey } = await keyRes.json();
+                const sub = await reg.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(publicKey)
+                });
+                await fetch('/push/subscribe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ subscription: sub.toJSON() })
+                });
+                showEstado('Notificaciones activadas: cada día a las 8:00 (y los lunes, también las de la semana).');
+            } else {
+                const sub = await reg.pushManager.getSubscription();
+                if (sub) {
+                    await fetch('/push/unsubscribe', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ endpoint: sub.endpoint })
+                    });
+                    await sub.unsubscribe();
+                }
+                showEstado('Notificaciones desactivadas.');
+            }
+        } catch (err) {
+            console.error('Error gestionando notificaciones push:', err);
+            toggle.checked = !toggle.checked;
+            showEstado('No se pudo cambiar el estado de las notificaciones.');
+        } finally {
+            toggle.disabled = false;
+        }
+    });
 }
 
 const tableSearchRegistry = new WeakMap();
