@@ -89,7 +89,7 @@ TRADUCCIONES.eu = {
 
         // ===== TEMA =====
         tema: {
-            cambiarTema: '🎨 Gaia:',
+            cambiarTema: 'Gaia:',
             seleccionar: 'Gaia hautatu',
             claro: 'Argia',
             oscuro: 'Iluna',
@@ -98,7 +98,7 @@ TRADUCCIONES.eu = {
 
         // ===== IDIOMA =====
         idioma: {
-            seleccionar: '🌐 Hizkuntza:',
+            seleccionar: 'Hizkuntza:',
             espanol: 'Español',
             ingles: 'English',
             portugues: 'Português',
@@ -542,6 +542,8 @@ TRADUCCIONES.eu = {
 
         // ===== IMPUESTOS =====
         taxes: {
+            puntualesTitulo: 'Zerga Puntualak',
+            mensualesTitulo: 'Hileroko Zergak',
             agregarPuntual: 'Zerga Puntuala Gehitu',
             agregarMensual: 'Hileroko Zerga Gehitu',
             impuestoAgregado: 'Zerga gehitu da',

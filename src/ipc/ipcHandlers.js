@@ -1004,11 +1004,9 @@ function registerIpcHandlers() {
     const BolsaService = require('../services/BolsaService');
     const bolsaService = new BolsaService();
 
-    // Ensure bolsa tables exist (runs pending migrations)
-    safeHandle('bolsa-ensure-setup', async () => {
-        await runMigrations();
-        return { success: true };
-    });
+    // (Se eliminó 'bolsa-ensure-setup': solo repetía runMigrations() en cada
+    // visita a Inversiones. Las migraciones ya se ejecutan al arrancar y al
+    // cambiar de usuario, y en modo web ese endpoint ni siquiera existía.)
 
     safeHandle('bolsa-get-operaciones', async () => {
         return await bolsaService.getOperaciones();

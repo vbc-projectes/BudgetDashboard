@@ -40,16 +40,17 @@ class GestorIdiomas {
             
             if (elemento.tagName === 'INPUT' || elemento.tagName === 'TEXTAREA') {
                 elemento.placeholder = texto;
-            } else if (elemento.tagName === 'BUTTON') {
-                // Para botones, preservar el icono si existe
-                const icono = elemento.querySelector('i');
+            } else {
+                // Preservar el icono en cualquier elemento, no solo en <button>:
+                // antes, un <label>/<h3> con <i> perdía el icono al traducirse
+                // (por eso "Moneda:" salía sin icono mientras Tema/Idioma
+                // parecían tenerlo — en realidad era un emoji dentro del texto).
+                const icono = elemento.querySelector(':scope > i');
                 if (icono) {
                     elemento.innerHTML = `${icono.outerHTML} ${texto}`;
                 } else {
                     elemento.textContent = texto;
                 }
-            } else {
-                elemento.textContent = texto;
             }
         });
 

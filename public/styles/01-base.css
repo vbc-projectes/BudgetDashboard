@@ -1251,8 +1251,12 @@ table {
     position: relative;
 }
 
+/* El aviso solo aparece si la tabla desborda de verdad — table-filters.js
+   añade .has-x-overflow comparando scrollWidth con clientWidth. Antes salía
+   en cualquier tabla por debajo de 1024px (aunque cupiera) y en ninguna por
+   encima (aunque no cupiera, como Cuenta Remunerada en un portátil). */
 .table-container::after {
-    content: '← Desliza para ver más →';
+    content: '';
     position: absolute;
     bottom: 5px;
     right: 10px;
@@ -1261,6 +1265,45 @@ table {
     pointer-events: none;
     opacity: 0.7;
     font-style: italic;
+}
+
+.table-container.has-x-overflow::after {
+    content: '← Desliza para ver más →';
+}
+
+/* ==================== FILA DE FILTROS ====================
+   Antes era indistinguible de la fila de alta que tiene justo encima: dos
+   filas de inputs casi idénticas, una que crea registros y otra que filtra.
+   Se le da fondo propio y un icono de embudo en la primera celda. */
+table tr.table-filter-row > td {
+    background: rgba(var(--bg-primary-rgb, 15, 118, 110), 0.055);
+    border-top: 1px solid rgba(var(--bg-primary-rgb, 15, 118, 110), 0.14);
+    border-bottom: 1px solid rgba(var(--bg-primary-rgb, 15, 118, 110), 0.14);
+    padding-top: 0.4rem;
+    padding-bottom: 0.4rem;
+}
+
+table tr.table-filter-row > td:first-child {
+    position: relative;
+}
+
+table tr.table-filter-row > td:first-child::before {
+    content: '\f0b0'; /* filter (Font Awesome) */
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    position: absolute;
+    left: 2px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.7rem;
+    color: var(--text-tertiary, #94a3b8);
+    pointer-events: none;
+}
+
+table tr.table-filter-row .table-column-filter-control {
+    font-size: 0.82rem;
+    padding: 0.35rem 0.5rem;
+    background: var(--bg-white, #fff);
 }
 
 /* ==================== TABLAS -> TARJETAS EN MÓVIL ====================
@@ -1343,6 +1386,13 @@ table {
         width: 100%;
         font-size: 0.78rem;
         padding: 5px 8px;
+    }
+
+    /* En modo tarjeta las celdas no tienen padding, así que el embudo se
+       solaparía con el primer control. El borde discontinuo ya distingue
+       la fila de filtros aquí. */
+    table.table-card-mobile tr.table-filter-row > td:first-child::before {
+        content: none;
     }
 
     table.table-card-mobile td[data-label]::before {
@@ -1544,6 +1594,23 @@ table button:last-child {
     margin-right: 0;
 }
 
+/* Celda de acciones: los botones son solo iconos, así que no necesitan el
+   padding horizontal de un botón con texto. Sin esto no caben dos botones
+   en los 120px de .w-120 y se apilan en vertical, duplicando la altura de
+   cada fila. El nowrap evita además que envuelvan si la columna se estrecha. */
+table td:last-child {
+    white-space: nowrap;
+}
+
+table td .btn-editar,
+table td .btn-eliminar,
+table td .editBtn,
+table td .delBtn,
+table td .saveBtn,
+table td .cancelBtn {
+    padding: 0.5rem 0.7rem !important;
+}
+
 table input,
 table select {
     padding: var(--spacing-sm);
@@ -1606,6 +1673,25 @@ table td strong {
     color: var(--success);
     font-size: 1.1rem;
     letter-spacing: 0.5px;
+}
+
+/* Semántica de color en tablas financieras. inversiones.js y bolsa.js ya
+   asignaban .text-green/.text-red según el signo del P&L, pero las clases no
+   estaban definidas en ninguna hoja: los importes salían sin color y, peor,
+   la regla de arriba pintaba de verde cualquier <strong> (incluido el ticker
+   de una posición con -40%). Se define aquí con especificidad suficiente
+   para ganar a `table td strong` sin recurrir a !important. */
+.text-green { color: var(--success); }
+.text-red   { color: var(--danger); }
+
+table td.text-green,
+table td.text-green strong {
+    color: var(--success);
+}
+
+table td.text-red,
+table td.text-red strong {
+    color: var(--danger);
 }
 
 .acciones-categoria {

@@ -90,7 +90,7 @@ TRADUCCIONES.en = {
 
         // ===== TEMA =====
         tema: {
-            cambiarTema: '🎨 Theme:',
+            cambiarTema: 'Theme:',
             seleccionar: 'Select theme',
             claro: 'Light',
             oscuro: 'Dark',
@@ -99,7 +99,7 @@ TRADUCCIONES.en = {
 
         // ===== IDIOMA =====
         idioma: {
-            seleccionar: '🌐 Language:',
+            seleccionar: 'Language:',
             espanol: 'Español',
             ingles: 'English',
             portugues: 'Português',
@@ -543,6 +543,8 @@ TRADUCCIONES.en = {
 
         // ===== IMPUESTOS =====
         taxes: {
+            puntualesTitulo: 'One-off Taxes',
+            mensualesTitulo: 'Monthly Taxes',
             agregarPuntual: 'Add One-time Tax',
             agregarMensual: 'Add Monthly Tax',
             impuestoAgregado: 'Tax added successfully',

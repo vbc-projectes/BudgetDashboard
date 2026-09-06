@@ -260,6 +260,39 @@ function obtenerLabelColumna(th, index) {
     return `Col ${index + 1}`;
 }
 
+/**
+ * Vuelca el texto de cada <th> en data-label de su <td> y marca la tabla, para
+ * que en móvil el CSS la pinte como tarjetas verticales ("Etiqueta: valor")
+ * en vez de obligar a desplazarse en horizontal. Se aplica a todas las tablas,
+ * no solo a las que genera TransactionManager.
+ */
+function aplicarEtiquetasDeColumna(table, headerCells) {
+    if (!table) return;
+    table.classList.add('table-card-mobile');
+    const labels = headerCells.map((th, i) => obtenerLabelColumna(th, i));
+    const filas = table.tBodies?.[0]?.rows || [];
+    Array.from(filas).forEach((row) => {
+        Array.from(row.cells).forEach((cell, i) => {
+            const label = labels[i];
+            // La columna de acciones no necesita etiqueta: son iconos.
+            if (!label || esColumnaAcciones(headerCells[i])) return;
+            if (cell.dataset.label !== label) cell.dataset.label = label;
+        });
+    });
+}
+
+/**
+ * El aviso "desliza para ver más" solo tiene sentido si la tabla desborda de
+ * verdad. Antes se mostraba en todas las tablas por debajo de 1024px (aunque
+ * cupieran) y en ninguna por encima (aunque no cupieran).
+ */
+function actualizarAvisoDesbordamiento(table) {
+    const wrapper = table?.closest('.table-container');
+    if (!wrapper) return;
+    const desborda = wrapper.scrollWidth > wrapper.clientWidth + 1;
+    wrapper.classList.toggle('has-x-overflow', desborda);
+}
+
 function esValorTipoFecha(value) {
     const normalized = String(value || '').trim();
     return /^\d{4}-\d{2}-\d{2}$/.test(normalized) || /^\d{4}-\d{2}$/.test(normalized);
@@ -421,6 +454,10 @@ function attachTableSearch(table) {
         const valoresUnicos = obtenerValoresUnicosColumna(table, index);
         const usarSelect = debeUsarSelectEnColumna(th, valoresUnicos);
 
+        // El title deja leer la columna completa cuando el placeholder se
+        // corta en tablas anchas ("Interés Ge...", "Reten...").
+        const tituloFiltro = `${obtenerTextoInterfaz('tablas.filtrarPor', 'Filtrar por')}: ${label}`;
+
         let control;
         if (usarSelect) {
             const select = document.createElement('select');
@@ -429,6 +466,7 @@ function attachTableSearch(table) {
             select.dataset.matchMode = 'exact';
             select.dataset.allText = textoTodos;
             select.setAttribute('aria-label', label);
+            select.title = tituloFiltro;
             control = select;
         } else {
             const input = document.createElement('input');
@@ -438,6 +476,7 @@ function attachTableSearch(table) {
             input.dataset.matchMode = 'includes';
             input.placeholder = label;
             input.setAttribute('aria-label', label);
+            input.title = tituloFiltro;
             control = input;
         }
 
@@ -492,19 +531,28 @@ function attachTableSearch(table) {
     if (tbody) {
         const observer = new MutationObserver(() => {
             actualizarOpcionesSelectDeFiltros(table, filterControls);
+            aplicarEtiquetasDeColumna(table, headerCells);
             aplicarFiltroTablaPorColumnas(table, filterControls);
+            actualizarAvisoDesbordamiento(table);
         });
         observer.observe(tbody, { childList: true, subtree: true });
         tableSearchRegistry.set(table, { observer });
     }
 
+    aplicarEtiquetasDeColumna(table, headerCells);
     aplicarFiltroTablaPorColumnas(table, filterControls);
+    actualizarAvisoDesbordamiento(table);
 }
 
 function initTableSearchers(scope = document) {
     const tables = scope.querySelectorAll('table[id]');
     tables.forEach((table) => attachTableSearch(table));
 }
+
+// El desbordamiento depende del ancho de la ventana, no solo de los datos.
+window.addEventListener('resize', () => {
+    document.querySelectorAll('.table-container table').forEach(actualizarAvisoDesbordamiento);
+});
 
 /**
  * Disconnect all MutationObservers registered by table searchers.

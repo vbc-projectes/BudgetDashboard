@@ -171,7 +171,6 @@ window.API = {
             'POST:/users/create':                  () => api.createUser(body),
             'POST:/users/select':                  () => api.setCurrentUser(body),
             // Bolsa / Inversiones
-            'POST:/bolsa/ensure-setup':            () => api.bolsaEnsureSetup(),
             'GET:/bolsa/operaciones':              () => api.bolsaGetOperaciones(),
             'POST:/bolsa/operaciones':             () => api.bolsaAddOperacion(body),
             'GET:/bolsa/dividendos':               () => api.bolsaGetDividendos(),

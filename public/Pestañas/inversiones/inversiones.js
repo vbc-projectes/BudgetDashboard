@@ -115,10 +115,10 @@ async function _renderActivos() {
     const tbody = document.getElementById('tbodyActivos');
     if (!tbody) return;
     if (!_inv.posiciones.length) {
-        tbody.innerHTML = `<tr><td colspan="10" class="text-center text-muted">${gestorIdiomas?.obtenerTexto('inversiones.sinPosicionesAbiertas') || 'Sin posiciones abiertas. Añade operaciones de compra.'}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="11" class="text-center text-muted">${gestorIdiomas?.obtenerTexto('inversiones.sinPosicionesAbiertas') || 'Sin posiciones abiertas. Añade operaciones de compra.'}</td></tr>`;
         return;
     }
-    tbody.innerHTML = `<tr><td colspan="10" class="text-center text-muted">${gestorIdiomas?.obtenerTexto('inversiones.cargando') || 'Cargando precios…'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" class="text-center text-muted">${gestorIdiomas?.obtenerTexto('inversiones.cargando') || 'Cargando precios…'}</td></tr>`;
 
     const rows = await Promise.all(_inv.posiciones.map(async pos => {
         const precio  = await _getPrice(pos.ticker);
@@ -128,7 +128,7 @@ async function _renderActivos() {
         const cls     = pnl === null ? '' : (pnl >= 0 ? 'text-green' : 'text-red');
 
         return `<tr>
-            <td><strong>${pos.ticker}</strong></td>
+            <td class="${cls}"><strong>${pos.ticker}</strong></td>
             <td>${pos.empresa || '—'}</td>
             <td>${_fmtNum(pos.cantidad)}</td>
             <td>${_fmt(pos.precio_medio)}</td>
@@ -1317,8 +1317,9 @@ async function initInversiones() {
         if (_inv[key]) { try { _inv[key].destroy(); } catch (_) {} _inv[key] = null; }
     });
 
-    // Asegurar que las tablas de bolsa existen (ejecuta migraciones pendientes)
-    try { await fetch('/bolsa/ensure-setup', { method: 'POST' }); } catch (_) {}
+    // (Antes había aquí un POST a /bolsa/ensure-setup que devolvía 404 en cada
+    // visita: nunca existió ni la ruta Express ni el handler IPC. Las tablas de
+    // bolsa ya las crean las migraciones al arrancar y al cambiar de usuario.)
     // Siempre recarga datos (con caché 60 s) y recablea eventos,
     // porque loadTab() reconstruye el DOM cada visita.
     await _loadBolsaData();

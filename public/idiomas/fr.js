@@ -89,7 +89,7 @@ TRADUCCIONES.fr = {
 
         // ===== TEMA =====
         tema: {
-            cambiarTema: '🎨 Thème:',
+            cambiarTema: 'Thème:',
             seleccionar: 'Sélectionner le thème',
             claro: 'Clair',
             oscuro: 'Sombre',
@@ -98,7 +98,7 @@ TRADUCCIONES.fr = {
 
         // ===== IDIOMA =====
         idioma: {
-            seleccionar: '🌐 Langue:',
+            seleccionar: 'Langue:',
             espanol: 'Español',
             ingles: 'English',
             portugues: 'Português',
@@ -543,6 +543,8 @@ exitoArchivoGuardado: 'Fichier enregistré avec succès',
 
         // ===== IMPUESTOS =====
         taxes: {
+            puntualesTitulo: 'Impôts Ponctuels',
+            mensualesTitulo: 'Impôts Mensuels',
             agregarPuntual: 'Ajouter Impôt Ponctuel',
             agregarMensual: 'Ajouter Impôt Mensuel',
             impuestoAgregado: 'Impôt ajouté avec succès',

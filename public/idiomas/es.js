@@ -90,7 +90,7 @@ TRADUCCIONES.es = {
 
         // ===== TEMA =====
         tema: {
-            cambiarTema: '🎨 Tema:',
+            cambiarTema: 'Tema:',
             seleccionar: 'Seleccionar tema',
             claro: 'Claro',
             oscuro: 'Oscuro',
@@ -99,7 +99,7 @@ TRADUCCIONES.es = {
 
         // ===== IDIOMA =====
         idioma: {
-            seleccionar: '🌐 Idioma:',
+            seleccionar: 'Idioma:',
             espanol: 'Español',
             ingles: 'English',
             portugues: 'Português',
@@ -543,6 +543,8 @@ TRADUCCIONES.es = {
 
         // ===== IMPUESTOS =====
         taxes: {
+            puntualesTitulo: 'Impuestos Puntuales',
+            mensualesTitulo: 'Impuestos Mensuales',
             agregarPuntual: 'Agregar Impuesto Puntual',
             agregarMensual: 'Agregar Impuesto Mensual',
             impuestoAgregado: 'Impuesto agregado correctamente',

@@ -145,7 +145,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     importSave: (data) => ipcRenderer.invoke('import-save', data),
 
     // ============= BOLSA / INVERSIONES =============
-    bolsaEnsureSetup: () => ipcRenderer.invoke('bolsa-ensure-setup'),
     bolsaGetOperaciones: () => ipcRenderer.invoke('bolsa-get-operaciones'),
     bolsaAddOperacion: (data) => ipcRenderer.invoke('bolsa-add-operacion', data),
     bolsaUpdateOperacion: (data) => ipcRenderer.invoke('bolsa-update-operacion', data),

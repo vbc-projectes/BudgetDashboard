@@ -287,6 +287,13 @@ function renderInicioEvolucion(ahorrosMes = [], ahorrosPrev = []) {
     const gastos = puntos.map((m) => Number(m.total_gastos) || (Number(m.gastos) || 0));
     const ahorros = puntos.map((m) => Number(m.ahorros) || 0);
 
+    // Con el período "1 Mes" solo hay 2 puntos: con marcadores de 2px la
+    // gráfica parecía una tendencia continua y dramática en vez de dos
+    // valores mensuales sueltos. Se agrandan cuando hay pocos puntos.
+    const pocosPuntos = puntos.length <= 3;
+    const puntoRadio = pocosPuntos ? 5 : 2.2;
+    const puntoRadioHover = pocosPuntos ? 7 : 4;
+
     const makeGradient = (color, alphaTop, alphaBottom) => {
         const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height || 220);
         gradient.addColorStop(0, hexToRgba(color, alphaTop));
@@ -319,8 +326,8 @@ function renderInicioEvolucion(ahorrosMes = [], ahorrosPrev = []) {
                     pointBorderWidth: 1,
                     tension: 0.38,
                     borderWidth: 2.4,
-                    pointRadius: 2.2,
-                    pointHoverRadius: 4,
+                    pointRadius: puntoRadio,
+                    pointHoverRadius: puntoRadioHover,
                     fill: true
                 },
                 {
@@ -333,8 +340,8 @@ function renderInicioEvolucion(ahorrosMes = [], ahorrosPrev = []) {
                     pointBorderWidth: 1,
                     tension: 0.38,
                     borderWidth: 2.4,
-                    pointRadius: 2.2,
-                    pointHoverRadius: 4,
+                    pointRadius: puntoRadio,
+                    pointHoverRadius: puntoRadioHover,
                     fill: true
                 },
                 {
@@ -348,8 +355,8 @@ function renderInicioEvolucion(ahorrosMes = [], ahorrosPrev = []) {
                     tension: 0.38,
                     borderWidth: 2.4,
                     borderDash: [5, 4],
-                    pointRadius: 2.2,
-                    pointHoverRadius: 4,
+                    pointRadius: puntoRadio,
+                    pointHoverRadius: puntoRadioHover,
                     fill: true
                 }
             ]
@@ -737,7 +744,11 @@ async function renderInicioPresupuestos(desde, hasta) {
                 '</tr>';
         }).join('');
 
-        var thStyle = 'padding:6px 10px;font-size:0.75rem;letter-spacing:.04em;text-transform:uppercase;color:var(--text-tertiary,#64748b);';
+        // background:transparent es necesario: la regla global
+        // `table thead tr:first-child th` pinta un degradado azul, y sin
+        // anularlo este texto gris queda ilegible sobre él.
+        var thStyle = 'padding:6px 10px;font-size:0.75rem;letter-spacing:.04em;text-transform:uppercase;'
+            + 'color:var(--text-tertiary,#64748b);background:transparent;position:static;';
         container.innerHTML =
             '<table style="width:100%;border-collapse:collapse;font-size:0.87rem;">' +
             '<thead><tr style="border-bottom:2px solid var(--border-light,#e2e8f0);">' +

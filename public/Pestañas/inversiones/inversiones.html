@@ -33,7 +33,7 @@
             <th data-i18n="tablas.pnl">P&amp;L</th>
             <th data-i18n="tablas.pnlPct">P&amp;L %</th>
             <th data-i18n="tablas.dividendosNetos">Dividendos netos</th>
-            <th></th>
+            <th class="w-120" data-i18n="tablas.acciones">Acciones</th>
           </tr>
         </thead>
         <tbody id="tbodyActivos"></tbody>
@@ -212,7 +212,7 @@
     <div class="inv-2col-grid" style="gap:16px;margin-bottom:16px;">
       <div class="inv-chart-card">
         <h4 style="margin:0 0 10px;" data-i18n="inversiones.mejoresVentasPct">&#127942; Mejores ventas por %</h4>
-        <div class="table-container" style="max-height:260px;">
+        <div class="table-container inv-ranking-scroll">
           <table class="res-ranking-table">
             <thead><tr><th data-i18n="tablas.ticker">Ticker</th><th data-i18n="tablas.fecha">Fecha</th><th>Acciones</th><th data-i18n="tablas.precioVenta">P. venta</th><th data-i18n="tablas.precioCoste">P. coste</th><th>%</th><th>€</th></tr></thead>
             <tbody id="resTopPct"><tr><td colspan="7" class="text-center text-muted" data-i18n="tablas.sinDatos">Sin datos</td></tr></tbody>
@@ -221,7 +221,7 @@
       </div>
       <div class="inv-chart-card">
         <h4 style="margin:0 0 10px;" data-i18n="inversiones.peoresVentasPct">&#128128; Peores ventas por %</h4>
-        <div class="table-container" style="max-height:260px;">
+        <div class="table-container inv-ranking-scroll">
           <table class="res-ranking-table">
             <thead><tr><th data-i18n="tablas.ticker">Ticker</th><th data-i18n="tablas.fecha">Fecha</th><th>Acciones</th><th data-i18n="tablas.precioVenta">P. venta</th><th data-i18n="tablas.precioCoste">P. coste</th><th>%</th><th>€</th></tr></thead>
             <tbody id="resBottomPct"><tr><td colspan="7" class="text-center text-muted" data-i18n="tablas.sinDatos">Sin datos</td></tr></tbody>
@@ -234,7 +234,7 @@
     <div class="inv-2col-grid" style="gap:16px;margin-bottom:16px;">
       <div class="inv-chart-card">
         <h4 style="margin:0 0 10px;" data-i18n="inversiones.mejoresVentasEur">&#128176; Mejores ventas por €</h4>
-        <div class="table-container" style="max-height:260px;">
+        <div class="table-container inv-ranking-scroll">
           <table class="res-ranking-table">
             <thead><tr><th data-i18n="tablas.ticker">Ticker</th><th data-i18n="tablas.fecha">Fecha</th><th>Acciones</th><th data-i18n="tablas.precioVenta">P. venta</th><th data-i18n="tablas.precioCoste">P. coste</th><th>€</th><th>%</th></tr></thead>
             <tbody id="resTopEur"><tr><td colspan="7" class="text-center text-muted" data-i18n="tablas.sinDatos">Sin datos</td></tr></tbody>
@@ -243,7 +243,7 @@
       </div>
       <div class="inv-chart-card">
         <h4 style="margin:0 0 10px;" data-i18n="inversiones.peoresVentasEur">&#128201; Peores ventas por €</h4>
-        <div class="table-container" style="max-height:260px;">
+        <div class="table-container inv-ranking-scroll">
           <table class="res-ranking-table">
             <thead><tr><th data-i18n="tablas.ticker">Ticker</th><th data-i18n="tablas.fecha">Fecha</th><th>Acciones</th><th data-i18n="tablas.precioVenta">P. venta</th><th data-i18n="tablas.precioCoste">P. coste</th><th>€</th><th>%</th></tr></thead>
             <tbody id="resBottomEur"><tr><td colspan="7" class="text-center text-muted" data-i18n="tablas.sinDatos">Sin datos</td></tr></tbody>

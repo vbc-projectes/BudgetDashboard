@@ -50,6 +50,30 @@
 }
 
 /* Chart section cards — white background */
+/* Tablas de ranking del Resumen: antes tenían max-height:260px en línea, que
+   no era múltiplo de la altura de fila y cortaba la última por la mitad,
+   pareciendo un fallo de render en vez de una zona desplazable. Se ajusta a
+   filas enteras y se añade un degradado que insinúa que hay más. */
+.inv-ranking-scroll {
+    max-height: 244px;
+    overflow-y: auto;
+    position: relative;
+}
+
+.inv-ranking-scroll::before {
+    content: '';
+    position: sticky;
+    display: block;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 22px;
+    margin-top: -22px;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.95));
+    pointer-events: none;
+    z-index: 2;
+}
+
 .inv-chart-card {
     background: #fff;
     border: 1px solid var(--border-light, #e0e0e0);
@@ -679,14 +703,15 @@ main {
     font-size: 0.9rem;
 }
 
-.ajustes-tab {
-    max-width: 980px;
-}
-
+/* Sin el max-width de 980px, la regla azul del <h2> se quedaba a media
+   pantalla y Ajustes era la única pestaña que no ocupaba el ancho completo. */
 .ajustes-grid {
     display: grid;
     gap: var(--spacing-2xl);
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    /* Sin esto las tarjetas se estiran a la altura de la más alta de su fila,
+       dejando ~120px muertos bajo un simple desplegable. */
+    align-items: start;
 }
 
 .ajustes-section {
@@ -1412,10 +1437,6 @@ main {
     box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
 }
 
-.table-container::after {
-    content: '';
-}
-
 .table-container table {
     margin-top: 0;
 }
@@ -1470,8 +1491,32 @@ table tbody tr:hover {
     background: #f8fbff;
 }
 
+/* 1620px obligaba a desplazamiento horizontal incluso en portátiles de
+   1440px, dejando la columna de acciones fuera de alcance. Con las columnas
+   numéricas ajustadas cabe en menos; si aun así desborda, table-filters.js
+   marca el contenedor y aparece el aviso de deslizar. */
 #tablaCuentaRemunerada {
-    min-width: 1620px;
+    min-width: 1280px;
+}
+
+#tablaCuentaRemunerada th,
+#tablaCuentaRemunerada td {
+    padding-left: 0.6rem;
+    padding-right: 0.6rem;
+}
+
+/* La columna de acciones queda siempre visible al desplazarse en horizontal. */
+#tablaCuentaRemunerada th:last-child,
+#tablaCuentaRemunerada td:last-child {
+    position: sticky;
+    right: 0;
+    background: var(--bg-white, #fff);
+    box-shadow: -2px 0 4px rgba(0, 0, 0, 0.06);
+}
+
+#tablaCuentaRemunerada thead tr:first-child th:last-child {
+    background: var(--gradient-primary);
+    z-index: 4;
 }
 
 #tablaCuentaRemunerada th,
@@ -1509,7 +1554,7 @@ table tbody tr:hover {
 }
 
 @media (max-width: 1024px) {
-    .table-container::after {
+    .table-container.has-x-overflow::after {
         content: 'Desliza para ver mas columnas';
         position: absolute;
         right: 10px;
